@@ -1,0 +1,60 @@
+# Evaluation set for scripts/run_eval.py.
+#
+# `expect` lists keywords a correct answer should contain. This is a coarse proxy for
+# answer quality — it detects when compression has destroyed the evidence needed to
+# answer, which is exactly the failure mode that matters here. It is not a substitute
+# for human judgment and should not be reported as accuracy.
+#
+# `answerable: false` marks questions the KB deliberately does not cover. A good system
+# abstains on these rather than inventing an answer, so they measure the abstain path.
+
+- query: What are the two tunable parameters of BM25?
+  expect: [k1, b]
+
+- query: What is TF-IDF?
+  expect: [term, frequency, document]
+
+- query: What is the context window of a language model?
+  expect: [tokens, attention]
+
+- query: How does dense retrieval differ from lexical retrieval?
+  expect: [vector, similarity]
+
+- query: What is prompt compression?
+  expect: [tokens, extractive]
+
+- query: Why does chunking need character offsets?
+  expect: [offsets, original]
+
+- query: What is natural language inference?
+  expect: [entailment, premise, hypothesis]
+
+- query: What is selective prediction?
+  expect: [abstain, threshold]
+
+- query: What is model calibration?
+  expect: [confidence, accuracy]
+
+- query: What causes hallucination in language models?
+  expect: [evidence, context]
+
+- query: What is reranking in a retrieval system?
+  expect: [cross-encoder, shortlist]
+
+- query: Why are ablation studies necessary?
+  expect: [component, contribution]
+
+- query: What is an embedding?
+  expect: [vector, similarity]
+
+- query: How does caching invalidation work for embeddings?
+  expect: [hash, model]
+
+# Deliberately outside the knowledge base — the system should abstain.
+- query: What is the capital city of Mongolia?
+  expect: []
+  answerable: false
+
+- query: Who won the 2019 Formula One world championship?
+  expect: []
+  answerable: false

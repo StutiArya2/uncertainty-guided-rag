@@ -1,0 +1,700 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reading Room — ask your papers</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314243d'/%3E%3Crect x='8' y='9' width='16' height='3.4' rx='1.7' fill='%230d8f80'/%3E%3Crect x='8' y='15' width='11' height='3.4' rx='1.7' fill='%230d8f80'/%3E%3Crect x='8' y='21' width='14' height='3.4' rx='1.7' fill='%235d6d87' opacity='.5'/%3E%3C/svg%3E">
+
+<style>
+/*
+  Two typefaces doing two jobs, and the difference is information:
+  sans is the tool speaking, serif is the paper speaking. A reader can tell
+  what came out of their document from what the app added, without being told.
+*/
+:root {
+  --paper:      #f6f8fb;
+  --surface:    #ffffff;
+  --ink:        #14243d;
+  --ink-soft:   #5d6d87;
+  --ink-faint:  #93a1b5;
+  --rule:       #dfe5ee;
+  --mark:       #0d8f80;   /* annotation teal — "used this" */
+  --mark-wash:  rgba(13,143,128,.13);
+  --hold:       #a9702a;   /* ochre — "held back", considered not alarming */
+  --hold-wash:  rgba(169,112,42,.11);
+  --focus:      #2563eb;
+
+  --ui:    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Charter, Georgia, serif;
+  --mono:  ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+
+  --shadow: 0 1px 2px rgba(20,36,61,.05), 0 8px 24px -12px rgba(20,36,61,.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #10151d; --surface: #171e28; --ink: #e6ecf5; --ink-soft: #9dabc0;
+    --ink-faint: #6b7a90; --rule: #26303d;
+    --mark: #3fd6c0; --mark-wash: rgba(63,214,192,.15);
+    --hold: #e0a761; --hold-wash: rgba(224,167,97,.14);
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 16px/1.55 var(--ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 780px; margin: 0 auto; padding: 0 20px 96px; }
+
+/* ---------- header ---------- */
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 20px 0 28px;
+}
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.brand b {
+  font-size: 17px; font-weight: 620; letter-spacing: -.02em;
+}
+.brand span {
+  font-size: 12.5px; color: var(--ink-faint); white-space: nowrap;
+}
+
+.btn {
+  font: inherit; font-size: 14px; font-weight: 550;
+  border: 1px solid var(--rule); border-radius: 9px;
+  background: var(--surface); color: var(--ink);
+  padding: 8px 14px; cursor: pointer;
+  transition: border-color .15s, transform .06s;
+}
+.btn:hover { border-color: var(--ink-faint); }
+.btn:active { transform: translateY(1px); }
+.btn-primary {
+  background: var(--ink); color: var(--paper); border-color: var(--ink);
+}
+.btn-primary:hover { opacity: .88; border-color: var(--ink); }
+.btn-primary[disabled] { opacity: .4; cursor: not-allowed; }
+
+:where(button, input, textarea, a, [tabindex]):focus-visible {
+  outline: 2.5px solid var(--focus); outline-offset: 2px; border-radius: 6px;
+}
+
+/* ---------- the ask ---------- */
+
+.lede {
+  font-family: var(--serif);
+  font-size: clamp(28px, 5.2vw, 40px);
+  line-height: 1.12; letter-spacing: -.018em;
+  margin: 8px 0 10px; font-weight: 400;
+}
+.lede em { font-style: italic; color: var(--mark); }
+.sub { color: var(--ink-soft); font-size: 15px; margin: 0 0 24px; max-width: 64ch; }
+
+.askbox {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 14px; box-shadow: var(--shadow);
+  padding: 6px 6px 6px 16px;
+  display: flex; align-items: flex-end; gap: 10px;
+  transition: border-color .15s;
+}
+.askbox:focus-within { border-color: var(--mark); }
+.askbox textarea {
+  flex: 1; border: 0; background: none; color: inherit;
+  font: inherit; font-size: 16.5px; resize: none; padding: 12px 0;
+  min-height: 26px; max-height: 160px; outline: none;
+}
+.askbox textarea::placeholder { color: var(--ink-faint); }
+
+.examples { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0 0; }
+.chip {
+  font: inherit; font-size: 13px; color: var(--ink-soft);
+  background: none; border: 1px dashed var(--rule); border-radius: 999px;
+  padding: 5px 12px; cursor: pointer;
+}
+.chip:hover { border-style: solid; border-color: var(--mark); color: var(--mark); }
+
+/* ---------- result ---------- */
+
+.result { margin-top: 34px; }
+.result[hidden] { display: none; }
+
+.verdict {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12.5px; font-weight: 600; letter-spacing: .02em;
+  padding: 5px 11px 5px 9px; border-radius: 999px; margin-bottom: 12px;
+}
+.verdict::before {
+  content: ""; width: 7px; height: 7px; border-radius: 50%;
+  background: currentColor;
+}
+.v-answered { color: var(--mark); background: var(--mark-wash); }
+.v-held     { color: var(--hold); background: var(--hold-wash); }
+
+.answer {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-left: 3px solid var(--mark);
+  border-radius: 4px 12px 12px 4px; box-shadow: var(--shadow);
+  padding: 22px 24px;
+}
+.answer.held { border-left-color: var(--hold); }
+.answer p {
+  font-family: var(--serif); font-size: 18.5px; line-height: 1.6;
+  margin: 0 0 12px;
+}
+.answer p:last-child { margin-bottom: 0; }
+.answer .next {
+  font-family: var(--ui); font-size: 14.5px; color: var(--ink-soft);
+  margin: 14px 0 0; padding-top: 14px; border-top: 1px solid var(--rule);
+}
+
+/* ---------- the receipt ---------- */
+
+.receipt {
+  display: flex; flex-wrap: wrap; gap: 10px 26px;
+  margin: 18px 2px 0; font-size: 13.5px; color: var(--ink-soft);
+}
+.receipt div { display: flex; align-items: baseline; gap: 6px; }
+.receipt b { font-weight: 620; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* ---------- signature: the marked-up passage ---------- */
+
+.evidence { margin-top: 34px; }
+.evidence-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; margin-bottom: 4px;
+}
+.evidence-head h2 {
+  font-size: 12px; font-weight: 680; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--ink-faint); margin: 0;
+}
+.linkish {
+  font: inherit; font-size: 13px; color: var(--mark);
+  background: none; border: 0; cursor: pointer; padding: 4px 0;
+}
+.linkish:hover { text-decoration: underline; }
+
+.source { margin-top: 16px; }
+.source-name {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .04em;
+  color: var(--ink-faint); text-transform: uppercase;
+  padding-bottom: 7px; margin-bottom: 4px; border-bottom: 1px solid var(--rule);
+}
+
+/* Each sentence is shown as the system saw it: used, or set aside. */
+.line {
+  font-family: var(--serif); font-size: 16.5px; line-height: 1.62;
+  padding: 7px 12px; margin: 3px 0; border-radius: 6px;
+  position: relative;
+}
+.line.used {
+  background: var(--mark-wash);
+  box-shadow: inset 2px 0 0 var(--mark);
+}
+/* Read and weighed, but nothing was answered from it — so no endorsing mark. */
+.line.considered {
+  background: var(--surface);
+  box-shadow: inset 2px 0 0 var(--rule);
+}
+.line.aside {
+  color: var(--ink-faint);
+  background: none;
+}
+.line .tag {
+  font-family: var(--ui); font-size: 10.5px; font-weight: 650;
+  letter-spacing: .05em; text-transform: uppercase;
+  color: var(--mark); margin-left: 8px; white-space: nowrap;
+}
+.line.aside .tag { color: var(--ink-faint); }
+.line.restored .tag { color: var(--hold); }
+
+/* The mark sweeps in once, when the answer lands. */
+@media (prefers-reduced-motion: no-preference) {
+  .line.used { animation: mark .42s cubic-bezier(.2,.8,.3,1) backwards; }
+  @keyframes mark {
+    from { background: transparent; box-shadow: inset 0 0 0 var(--mark); }
+  }
+}
+
+.aside-group[hidden] { display: none; }
+
+/* ---------- details for the technical reader ---------- */
+
+.tech { margin-top: 30px; border-top: 1px solid var(--rule); padding-top: 14px; }
+.tech summary {
+  font-size: 13px; color: var(--ink-faint); cursor: pointer; list-style: none;
+}
+.tech summary::-webkit-details-marker { display: none; }
+.tech summary::before { content: "▸ "; }
+.tech[open] summary::before { content: "▾ "; }
+.tech table {
+  width: 100%; border-collapse: collapse; margin-top: 12px;
+  font-family: var(--mono); font-size: 12px;
+}
+.tech th, .tech td {
+  text-align: left; padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--rule); color: var(--ink-soft);
+}
+.tech th { color: var(--ink-faint); font-weight: 500; }
+.tech td b { color: var(--ink); font-weight: 600; }
+
+/* ---------- status + errors ---------- */
+
+.note {
+  border-radius: 10px; padding: 13px 16px; font-size: 14.5px;
+  border: 1px solid var(--rule); background: var(--surface); color: var(--ink-soft);
+  margin-top: 20px;
+}
+.note.bad { border-color: var(--hold); background: var(--hold-wash); color: var(--ink); }
+
+.thinking { display: flex; align-items: center; gap: 11px; }
+.thinking i {
+  width: 9px; height: 9px; border-radius: 50%; background: var(--mark);
+  animation: pulse 1.1s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: .25; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .thinking i { animation: none; } }
+
+/* ---------- papers ---------- */
+
+dialog {
+  border: 1px solid var(--rule); border-radius: 16px; padding: 0;
+  background: var(--surface); color: var(--ink);
+  max-width: 560px; width: calc(100% - 32px); box-shadow: var(--shadow);
+}
+dialog::backdrop { background: rgba(20,36,61,.42); backdrop-filter: blur(2px); }
+dialog { max-height: 88vh; }
+.sheet { padding: 22px 24px 24px; }
+
+/* The list scrolls inside itself so "add a paper" never gets pushed out of reach —
+   with a couple of dozen papers loaded it otherwise fills the whole sheet. */
+#paperList { max-height: 30vh; overflow-y: auto; margin-right: -4px; padding-right: 4px; }
+.sheet h2 { margin: 0 0 4px; font-size: 19px; letter-spacing: -.01em; }
+.sheet .hint { margin: 0 0 18px; font-size: 14px; color: var(--ink-soft); }
+
+.field { margin-bottom: 13px; }
+.field label {
+  display: block; font-size: 12.5px; font-weight: 600;
+  color: var(--ink-soft); margin-bottom: 5px;
+}
+.field input[type=text], .field textarea {
+  width: 100%; font: inherit; font-size: 15px; color: inherit;
+  background: var(--paper); border: 1px solid var(--rule);
+  border-radius: 9px; padding: 10px 12px; outline: none;
+}
+.field textarea { min-height: 132px; resize: vertical; font-family: var(--serif); }
+.field input:focus, .field textarea:focus { border-color: var(--mark); }
+
+.or {
+  display: flex; align-items: center; gap: 12px;
+  color: var(--ink-faint); font-size: 12px; margin: 16px 0;
+}
+.or::before, .or::after {
+  content: ""; flex: 1; height: 1px; background: var(--rule);
+}
+
+.paper-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--rule);
+}
+.paper-row:last-child { border-bottom: 0; }
+.paper-row > div { min-width: 0; }
+.paper-row b { display: block; font-size: 14.5px; font-weight: 580; }
+.paper-row span { font-size: 12px; color: var(--ink-faint); }
+.remove {
+  font: inherit; font-size: 12.5px; color: var(--ink-faint);
+  background: none; border: 0; cursor: pointer; flex-shrink: 0;
+}
+.remove:hover { color: var(--hold); text-decoration: underline; }
+
+.sheet-actions {
+  display: flex; justify-content: flex-end; gap: 9px; margin-top: 20px;
+}
+
+@media (max-width: 560px) {
+  .topbar { flex-wrap: wrap; }
+  .receipt { gap: 8px 18px; }
+}
+
+/* On a phone the button squeezes the one-row input until the placeholder wraps and
+   clips. Stacking gives the question its full width and a full-width tap target. */
+@media (max-width: 460px) {
+  .askbox { flex-direction: column; align-items: stretch; padding: 14px; gap: 12px; }
+  .askbox textarea { padding: 0; min-height: 46px; }
+  .askbox .btn { width: 100%; padding: 11px; }
+}
+</style>
+
+<div class="wrap">
+
+  <header class="topbar">
+    <div class="brand">
+      <b>Reading Room</b>
+      <span id="paperCount">—</span>
+    </div>
+    <button class="btn" id="openPapers">Your papers</button>
+  </header>
+
+  <h1 class="lede">Ask your papers a question — and see <em>exactly</em> where the answer came from.</h1>
+  <p class="sub">
+    Every answer is built only from sentences in your documents, and those sentences
+    are shown to you. When the papers don't answer the question, this says so instead
+    of guessing.
+  </p>
+
+  <div class="askbox">
+    <!-- The placeholder labels; the chips below demonstrate. An example here too
+         wrapped to two lines on a phone and clipped. -->
+    <textarea id="q" rows="1" placeholder="Ask a question about your papers…"
+              aria-label="Your question"></textarea>
+    <button class="btn btn-primary" id="ask">Ask</button>
+  </div>
+  <div class="examples" id="examples"></div>
+
+  <div id="status"></div>
+
+  <section class="result" id="result" hidden aria-live="polite">
+    <div id="verdict"></div>
+    <div class="answer" id="answer"></div>
+    <div class="receipt" id="receipt"></div>
+
+    <section class="evidence" id="evidence">
+      <div class="evidence-head">
+        <h2 id="evidenceTitle">Where this came from</h2>
+        <button class="linkish" id="toggleAside" hidden></button>
+      </div>
+      <div id="sources"></div>
+    </section>
+
+    <details class="tech">
+      <summary>Technical detail</summary>
+      <div id="techBody"></div>
+    </details>
+  </section>
+</div>
+
+<dialog id="papers">
+  <div class="sheet">
+    <h2>Your papers</h2>
+    <p class="hint">Questions are answered only from what's here.</p>
+    <div id="paperList"></div>
+
+    <div class="or">add a paper</div>
+
+    <div class="field">
+      <label for="title">Title</label>
+      <input type="text" id="title" placeholder="e.g. Attention Is All You Need">
+    </div>
+    <div class="field">
+      <label for="body">Paste the text</label>
+      <textarea id="body" placeholder="Paste the abstract, a section, or the whole paper…"></textarea>
+    </div>
+
+    <div class="or">or</div>
+    <button class="btn" id="pickFile" style="width:100%">Choose a PDF or .txt file</button>
+    <input type="file" id="file" accept=".pdf,.txt" hidden>
+
+    <div id="paperStatus"></div>
+
+    <div class="sheet-actions">
+      <button class="btn" id="closePapers">Close</button>
+      <button class="btn btn-primary" id="addPaper">Add paper</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const EXAMPLES = [
+  "What are the two tunable parameters of BM25?",
+  "What is calibration?",
+  "Why does chunking need character offsets?",
+];
+
+/* ---- plain language ----------------------------------------------------
+   The pipeline speaks in scores. A reader needs words. These are the only
+   places raw numbers become sentences; the numbers stay available under
+   "Technical detail" for anyone who wants them.                          */
+
+function matchQuality(uncertainty) {
+  if (uncertainty < 0.35) return "Clear match";
+  if (uncertainty < 0.65) return "Reasonable match";
+  return "Loose match";
+}
+function evidenceStrength(support) {
+  if (support >= 0.7) return "Strong";
+  if (support >= 0.3) return "Moderate";
+  return "Weak";
+}
+
+/* ---- papers ---- */
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  const data = await res.json().catch(() => ({ error: "The server sent something unreadable." }));
+  if (!res.ok) throw new Error(data.error || "Request failed.");
+  return data;
+}
+
+function renderPapers(papers) {
+  $("paperCount").textContent =
+    papers.length === 0 ? "no papers yet"
+    : papers.length === 1 ? "1 paper" : papers.length + " papers";
+
+  $("paperList").innerHTML = papers.length
+    ? papers.map(p => `
+        <div class="paper-row">
+          <div>
+            <b>${esc(p.title)}</b>
+            <span>${p.words.toLocaleString()} words</span>
+          </div>
+          <button class="remove" data-id="${esc(p.doc_id)}">Remove</button>
+        </div>`).join("")
+    : `<p class="hint" style="margin:0">Nothing here yet. Add a paper below.</p>`;
+
+  $("paperList").querySelectorAll(".remove").forEach(b => {
+    b.onclick = async () => {
+      b.disabled = true; b.textContent = "Removing…";
+      try {
+        const d = await api("/api/papers/delete", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ doc_id: b.dataset.id })
+        });
+        renderPapers(d.papers);
+      } catch (e) { note("paperStatus", e.message, true); }
+    };
+  });
+}
+
+function note(target, msg, bad) {
+  $(target).innerHTML = msg ? `<div class="note${bad ? " bad" : ""}">${esc(msg)}</div>` : "";
+}
+
+async function refreshPapers() {
+  try { renderPapers((await api("/api/papers")).papers); }
+  catch (e) { note("status", e.message, true); }
+}
+
+/* ---- asking ---- */
+
+let asking = false;
+
+async function ask(query) {
+  if (asking || !query.trim()) return;
+  asking = true;
+  $("ask").disabled = true;
+  $("result").hidden = true;
+  $("status").innerHTML =
+    `<div class="note thinking"><i></i> Reading your papers…
+     <span style="color:var(--ink-faint)">first question takes longer while the models load</span></div>`;
+
+  try {
+    const data = await api("/api/ask", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query })
+    });
+    note("status", "");
+    render(data);
+  } catch (e) {
+    note("status", e.message, true);
+  } finally {
+    asking = false;
+    $("ask").disabled = false;
+  }
+}
+
+function render(d) {
+  const t = d.trace;
+  const restored = t.restoration_triggered;
+
+  $("verdict").innerHTML = d.abstained
+    ? `<div class="verdict v-held">Held back — not enough in your papers</div>`
+    : `<div class="verdict v-answered">Answered from your papers${restored ? " · took a second look" : ""}</div>`;
+
+  const box = $("answer");
+  box.className = "answer" + (d.abstained ? " held" : "");
+  if (d.abstained) {
+    box.innerHTML =
+      `<p>I couldn't answer this from the papers you've added.</p>` +
+      `<p class="next">${esc(plainReason(d))}</p>`;
+  } else {
+    box.innerHTML = `<p>${esc(d.answer)}</p>`;
+  }
+
+  // The receipt: what it read, what it used, what that saved.
+  const used = t.claims.reduce((n, c) => n + c.kept.length, 0);
+  const total = t.claims.reduce((n, c) => n + c.kept.length + c.dropped.length, 0);
+  const strength = evidenceStrength(Math.max(...t.claims.map(c =>
+    c.restored_support_score ?? c.support_score), 0));
+  const quality = matchQuality(Math.max(...t.claims.map(c => c.uncertainty), 0));
+
+  // When it held back, nothing was "used" and there is no saving to celebrate —
+  // reporting one would be noise at best and misleading at worst.
+  $("receipt").innerHTML = d.abstained
+    ? `<div>Looked at <b>${total}</b> passages</div>
+       <div>Strongest evidence: <b>${strength}</b></div>
+       <div>${esc(quality)}</div>`
+    : `<div><b>${used}</b> of <b>${total}</b> passages used</div>
+       <div><b>${Math.round(t.reduction * 100)}%</b> less text to read</div>
+       <div>Evidence: <b>${strength}</b></div>
+       <div>${esc(quality)}</div>`;
+
+  renderEvidence(t, restored, d.abstained);
+  renderTech(d, t);
+  $("result").hidden = false;
+  $("result").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function plainReason(d) {
+  if (d.branch === "abstain_clarify")
+    return "The question covers a few things and the papers only cover part of it. Try asking about one thing at a time.";
+  return "Nothing in these papers is close enough to the question. Try different words, or add the paper that covers it.";
+}
+
+/* The signature view: the passage as the system marked it up. */
+function renderEvidence(t, restored, abstained) {
+  // "Used" would be a lie when nothing was answered — these passages were read and
+  // judged insufficient, so the heading and tags say that instead.
+  $("evidenceTitle").textContent = abstained ? "What it looked at" : "Where this came from";
+
+  const byDoc = new Map();
+  for (const claim of t.claims) {
+    for (const [kind, units] of [["used", claim.kept], ["aside", claim.dropped]]) {
+      for (const u of units) {
+        if (!byDoc.has(u.doc_id)) byDoc.set(u.doc_id, []);
+        byDoc.get(u.doc_id).push({ ...u, kind });
+      }
+    }
+  }
+
+  // Most relevant source first, then sentences in the order they appear in that
+  // document — so the paper that actually answered the question leads, and each
+  // passage still reads in its original order.
+  const docs = [...byDoc.entries()].sort((a, b) =>
+    Math.max(...b[1].map(u => u.score)) - Math.max(...a[1].map(u => u.score)));
+
+  let anyAside = false;
+  const html = [];
+  for (const [docId, units] of docs) {
+    units.sort((a, b) => a.start - b.start);
+    const lines = units.map(u => {
+      if (u.kind === "aside") anyAside = true;
+      const tag = u.kind === "used" ? (abstained ? "considered" : "used")
+                : restored ? "set aside · brought back" : "set aside";
+      const cls = u.kind === "used" ? (abstained ? "considered" : "used")
+                : "aside" + (restored ? " restored" : "");
+      return `<div class="line ${cls}" ${u.kind === "aside" ? 'data-aside="1"' : ""}>
+                ${esc(u.text)}<span class="tag">${tag}</span>
+              </div>`;
+    }).join("");
+    html.push(`<div class="source">
+                 <div class="source-name">${esc(docId.replace(/_/g, " "))}</div>
+                 ${lines}
+               </div>`);
+  }
+  $("sources").innerHTML = html.join("");
+
+  const btn = $("toggleAside");
+  btn.hidden = !anyAside;
+  let shown = true;
+  const sync = () => {
+    document.querySelectorAll('[data-aside]').forEach(el => el.hidden = !shown);
+    btn.textContent = shown ? "Hide what was set aside" : "Show what was set aside";
+  };
+  btn.onclick = () => { shown = !shown; sync(); };
+  sync();
+}
+
+function renderTech(d, t) {
+  const rows = t.claims.map(c => `
+    <tr>
+      <td><b>${esc(c.claim)}</b></td>
+      <td>${c.uncertainty.toFixed(3)}</td>
+      <td>${c.keep_ratio.toFixed(2)}</td>
+      <td>${c.baseline_tokens}→${c.compressed_tokens}</td>
+      <td>${(c.restored_support_score ?? c.support_score).toFixed(3)}</td>
+    </tr>`).join("");
+
+  $("techBody").innerHTML = `
+    <table>
+      <tr><th>claim</th><th>uncertainty</th><th>keep</th><th>tokens</th><th>support</th></tr>
+      ${rows}
+    </table>
+    <table style="margin-top:14px">
+      <tr><td>branch</td><td><b>${esc(d.branch)}</b></td></tr>
+      <tr><td>tokens</td><td><b>${t.baseline_tokens} → ${t.final_tokens}</b>
+          (${(t.reduction * 100).toFixed(1)}% reduction,
+          counts ${t.token_counts_exact ? "exact" : "estimated"})</td></tr>
+      <tr><td>restoration</td><td><b>${t.restoration_triggered ? "triggered" : "not needed"}</b></td></tr>
+    </table>`;
+}
+
+/* ---- wiring ---- */
+
+$("examples").innerHTML = EXAMPLES.map(e => `<button class="chip">${esc(e)}</button>`).join("");
+$("examples").querySelectorAll(".chip").forEach(c => {
+  c.onclick = () => { $("q").value = c.textContent; ask(c.textContent); };
+});
+
+$("ask").onclick = () => ask($("q").value);
+$("q").addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask($("q").value); }
+});
+$("q").addEventListener("input", e => {
+  e.target.style.height = "auto";
+  e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
+});
+
+$("openPapers").onclick = () => { note("paperStatus", ""); $("papers").showModal(); };
+$("closePapers").onclick = () => $("papers").close();
+
+$("pickFile").onclick = () => $("file").click();
+$("file").onchange = async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  note("paperStatus", `Reading ${f.name}…`);
+  try {
+    let data;
+    if (f.name.toLowerCase().endsWith(".pdf")) {
+      data = await api("/api/papers", {
+        method: "POST",
+        headers: { "Content-Type": "application/pdf", "X-Paper-Title": f.name.replace(/\.pdf$/i, "") },
+        body: await f.arrayBuffer()
+      });
+    } else {
+      data = await api("/api/papers", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: f.name.replace(/\.txt$/i, ""), text: await f.text() })
+      });
+    }
+    renderPapers(data.papers);
+    note("paperStatus", `Added ${f.name}.`);
+  } catch (err) { note("paperStatus", err.message, true); }
+  e.target.value = "";
+};
+
+$("addPaper").onclick = async () => {
+  const title = $("title").value, text = $("body").value;
+  $("addPaper").disabled = true;
+  note("paperStatus", "Adding…");
+  try {
+    const d = await api("/api/papers", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, text })
+    });
+    renderPapers(d.papers);
+    $("title").value = ""; $("body").value = "";
+    note("paperStatus", "Added.");
+  } catch (e) { note("paperStatus", e.message, true); }
+  finally { $("addPaper").disabled = false; }
+};
+
+refreshPapers();
+$("q").focus();
+</script>

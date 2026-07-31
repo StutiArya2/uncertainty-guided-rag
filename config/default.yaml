@@ -1,0 +1,97 @@
+# Every threshold the pipeline depends on lives here.
+# Per CLAUDE.md: "Prefer explicit config (yaml/json) over hardcoded thresholds."
+# Nothing in src/ should contain a bare numeric threshold.
+
+models:
+  # Retrieval embeddings — mean-pooled, loaded via transformers.AutoModel.
+  embedding: sentence-transformers/all-MiniLM-L6-v2
+  # Final answer generation. 0.5B is the default because it is what the numbers reported
+  # in README.md were actually measured with — the config and the results table match.
+  # Qwen/Qwen2.5-1.5B-Instruct is a drop-in quality upgrade (~3 GB instead of ~1 GB);
+  # swap it in and re-run scripts/run_eval.py if you change it.
+  generation: Qwen/Qwen2.5-0.5B-Instruct
+  # Claim support models live under `evaluation.scorers` below, since each one carries
+  # its own threshold and the two must stay together.
+  # torch device: "auto" picks mps on arm64 Macs, else cuda, else cpu.
+  device: auto
+
+kb:
+  path: data/kb
+  # Sentence chunks shorter than this are merged into the neighbouring chunk, so that
+  # fragments like "Dr." or a stray bullet never become standalone evidence units.
+  min_chunk_chars: 40
+  max_chunk_chars: 600
+
+retrieval:
+  # Candidates pulled per claim before mapping.
+  top_k: 8
+  # Embeddings are cached to disk keyed by (model, corpus hash).
+  cache_dir: .cache/embeddings
+
+claims:
+  # "heuristic" = deterministic rule-based splitter (default, testable, no model call).
+  # "llm" = decomposition via the generation model (Fall extension).
+  strategy: heuristic
+  max_claims: 6
+
+uncertainty:
+  # u_claim = w_score * (1 - s_top) + w_margin * (1 - margin / margin_scale)
+  # with both bracketed terms clamped to [0, 1].
+  # Weights must sum to 1.0; validated at load time.
+  estimator: retrieval_score
+  w_score: 0.6
+  w_margin: 0.4
+  # Cosine margins are small in absolute terms — a gap of ~0.15 between the top hit and
+  # the runner-up already means a decisive ranking. The raw margin is divided by this
+  # before being treated as a [0, 1] confidence.
+  margin_scale: 0.15
+
+compression:
+  # keep_ratio = min_keep + u_claim * (max_keep - min_keep)
+  # Low uncertainty (confident retrieval) -> compress hard. High uncertainty -> keep more.
+  min_keep: 0.25
+  max_keep: 1.0
+  # Never drop below this many units for a claim, regardless of confidence.
+  floor_units: 1
+
+evaluation:
+  # Which support scorer to use. Both are real options, and switching between them is a
+  # planned ablation — see src/evaluation.py for the measurements behind this default.
+  #
+  #   relevance — "does this evidence address this claim?"  Correct for claims derived
+  #               from a *question*, which are topics rather than assertions.
+  #   nli       — "does this evidence entail this claim?"   Correct for claims derived
+  #               from a *draft answer*, which are declarative assertions.
+  #
+  # Claims here come from the query (claims.strategy), so relevance is the default.
+  scorer: relevance
+
+  # Evidence units are scored individually and the claim takes the best one. Measured:
+  # concatenating a claim's units dropped its score from 0.997 to 0.510, because
+  # irrelevant neighbours dilute the signal.
+  aggregate: max
+
+  # Thresholds are per-scorer: the two produce different score scales, so a single
+  # shared threshold would silently misbehave when the scorer is switched.
+  scorers:
+    relevance:
+      model: cross-encoder/ms-marco-MiniLM-L-6-v2
+      # Measured over the 16-question eval set: lowest answerable claim scored 0.205,
+      # highest unanswerable scored 0.001. 0.15 sits inside that gap.
+      threshold: 0.15
+    nli:
+      model: MoritzLaurer/DeBERTa-v3-large-mnli-fever-anli-ling-wanli
+      threshold: 0.55
+
+abstain:
+  # If every retrieved candidate for a claim scores below this, the KB likely lacks the
+  # answer -> recommend retrieve-more rather than clarify.
+  low_retrieval_score: 0.25
+  # If the query decomposed into more claims than this and support is broadly weak,
+  # the question is probably ambiguous -> recommend clarify.
+  ambiguous_claim_count: 3
+
+generation:
+  max_new_tokens: 256
+  # Greedy by default so runs are reproducible.
+  temperature: 0.0

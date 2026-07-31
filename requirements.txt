@@ -1,0 +1,13 @@
+# Core numerics — retrieval uses brute-force cosine over numpy, no vector-store dependency.
+numpy>=2.0
+
+# Local model backend: embeddings, NLI claim support, and generation all run through
+# transformers. No API keys, no per-call cost, fully offline after first model download.
+torch>=2.9
+transformers>=4.57
+
+# Explicit config over hardcoded thresholds (see CLAUDE.md conventions).
+pyyaml>=6.0
+
+# Tests from day one.
+pytest>=8.0
