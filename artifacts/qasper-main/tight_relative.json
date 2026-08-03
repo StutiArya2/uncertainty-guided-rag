@@ -1,14 +1,13 @@
 {
   "provenance": {
-    "timestamp_utc": "2026-08-03T11:45:26+00:00",
+    "timestamp_utc": "2026-08-03T14:16:32+00:00",
     "command": "python scripts/run_eval.py --questions data/qasper/questions.yaml --kb data/qasper/kb --no-contextualize --answer-style extractive --support-threshold 0.01 --set compression.max_keep=0.45 --set compression.min_keep=0.1 --set restoration.policy=relative --modes identity uncertainty_guided fixed_ratio random --random-seeds 5 --json artifacts/qasper-main/tight_relative.json",
     "git": {
-      "commit": "5b2fe5af3dc4fd1cd7cc95c908c4e7e97eeebf00",
+      "commit": "85691213fed72666fbd338098134816a703db003",
       "branch": "research/qasper-ablation",
       "dirty": true,
       "dirty_files": [
-        "M scripts/run_eval.py",
-        "?? artifacts/qasper-main/tight_absolute.json"
+        "M artifacts/qasper-main/tight_absolute.json"
       ]
     },
     "models": {
@@ -157,7 +156,7 @@
         "lost_completely_missed": 0,
         "total_loss_missed_rate": 0.0
       },
-      "elapsed_seconds": 155.7,
+      "elapsed_seconds": 83.5,
       "seed_spread": null,
       "rows": [
         {
@@ -8473,7 +8472,7 @@
         "lost_completely_missed": 41,
         "total_loss_missed_rate": 0.6029
       },
-      "elapsed_seconds": 105.4,
+      "elapsed_seconds": 73.5,
       "seed_spread": null,
       "rows": [
         {
@@ -16789,7 +16788,7 @@
         "lost_completely_missed": 40,
         "total_loss_missed_rate": 0.5479
       },
-      "elapsed_seconds": 84.2,
+      "elapsed_seconds": 61.5,
       "seed_spread": null,
       "rows": [
         {
@@ -25105,7 +25104,7 @@
         "lost_completely_missed": 21,
         "total_loss_missed_rate": 0.2143
       },
-      "elapsed_seconds": 490.9,
+      "elapsed_seconds": 363.8,
       "seed_spread": {
         "n_seeds": 5,
         "reduction": [
