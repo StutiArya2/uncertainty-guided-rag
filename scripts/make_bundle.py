@@ -25,7 +25,20 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from src.provenance import git_state  # noqa: E402
+from src.provenance import _is_input, git_state  # noqa: E402
+
+
+def dirty_inputs(git: dict) -> list[str]:
+    """Modified files that could have changed the result, ignoring other runs' outputs.
+
+    Records written before the input/output distinction existed still list every dirty
+    file, so they are classified here rather than condemned wholesale — re-running an
+    experiment to satisfy a metadata format change would be absurd.
+    """
+    recorded = git.get("dirty_input_files")
+    if recorded is not None:
+        return recorded
+    return [line for line in (git.get("dirty_files") or []) if _is_input(line)]
 
 
 def load_runs(bundle: Path) -> list[tuple[Path, dict]]:
@@ -70,7 +83,7 @@ def summarise(path: Path, run: dict) -> list[str]:
             "",
         ]
     else:
-        dirty = git.get("dirty_inputs", git.get("dirty"))
+        dirty = bool(dirty_inputs(git))
         lines += [
             f"- commit: `{git.get('commit') or 'unknown'}`"
             + ("  **(modified sources — not reproducible from this commit)**" if dirty else ""),
@@ -129,12 +142,11 @@ def main(argv: list[str] | None = None) -> int:
         # Only modified *inputs* break reproducibility. Runs write into artifacts/, so
         # every experiment after the first in a session sees the previous one's output
         # sitting uncommitted; failing on that would make the check meaningless noise.
-        dirty_inputs = git.get("dirty_inputs")
-        if dirty_inputs is None:
-            dirty_inputs = git.get("dirty")  # older records predate the distinction
-        if dirty_inputs:
-            files = ", ".join(git.get("dirty_input_files") or git.get("dirty_files") or [])
-            problems.append(f"{path.name}: produced from modified sources ({files})")
+        offenders = dirty_inputs(git)
+        if offenders:
+            problems.append(
+                f"{path.name}: produced from modified sources ({', '.join(offenders)})"
+            )
         if git.get("commit") is None:
             problems.append(f"{path.name}: no commit recorded")
 
