@@ -16,20 +16,34 @@ from .types import Answer, Branch, ClaimEvidence, ClaimVerdict
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM_PROMPT = (
-    "You answer strictly from the evidence provided. "
-    "Do not add facts that are not in the evidence. "
-    "Keep the answer to a few sentences."
-)
+
+def answer_style(cfg: Config | None = None, name: str | None = None) -> dict:
+    """Resolve the active answer style — system prompt, prompt instruction, token cap.
+
+    Answer length is a scored property, not a presentation detail. Answer F1 is unigram
+    overlap against gold answers that are a median of 7 words on QASPER, so a correct but
+    verbose answer is penalised on precision: ~40 words against a 7-word gold caps F1
+    near 0.30 however right it is. Styles exist so the benchmark and the web UI can ask
+    for different things from the same pipeline instead of one silently mis-serving the
+    other. See config/default.yaml for the definitions.
+    """
+    cfg = cfg or default_config()
+    name = name or cfg.get_path("generation.style", "prose")
+    style = cfg.get_path(f"generation.styles.{name}")
+    if not isinstance(style, dict):
+        available = sorted(cfg.get_path("generation.styles", {}))
+        raise KeyError(f"unknown generation.style {name!r}; available: {available}")
+    return style
 
 
 class Generator:
     """Local instruction-tuned generator."""
 
-    def __init__(self, cfg: Config | None = None) -> None:
+    def __init__(self, cfg: Config | None = None, style: str | None = None) -> None:
         self.cfg = cfg or default_config()
         self.model_id = self.cfg.require("models.generation")
         self.device = resolve_device(self.cfg.get_path("models.device", "auto"))
+        self.style = answer_style(self.cfg, style)
         self._model = None
         self._tokenizer = None
 
@@ -54,11 +68,14 @@ class Generator:
         """Run the chat template over a single user turn and return the reply."""
         model, tokenizer = self._load()
         torch = self._torch
-        limit = max_new_tokens or int(self.cfg.get_path("generation.max_new_tokens", 256))
+        limit = max_new_tokens or int(
+            self.style.get("max_new_tokens")
+            or self.cfg.get_path("generation.max_new_tokens", 256)
+        )
         temperature = float(self.cfg.get_path("generation.temperature", 0.0))
 
         messages = [
-            {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "system", "content": self.style["system"]},
             {"role": "user", "content": prompt},
         ]
         text = tokenizer.apply_chat_template(
@@ -80,11 +97,19 @@ class Generator:
         return tokenizer.decode(generated, skip_special_tokens=True).strip()
 
 
-def build_prompt(query: str, evidence: list[ClaimEvidence]) -> str:
+_DEFAULT_INSTRUCTION = "Answer the question using only the evidence below."
+
+
+def build_prompt(
+    query: str, evidence: list[ClaimEvidence], instruction: str | None = None
+) -> str:
     """Assemble the evidence prompt, grouped claim-wise.
 
     Only the units present in `evidence` are included — this is where compression
     actually converts into saved tokens.
+
+    `instruction` comes from the answer style. Small instruct models follow the user turn
+    more reliably than the system turn, so the length requirement is stated in both.
     """
     blocks: list[str] = []
     for item in evidence:
@@ -94,7 +119,8 @@ def build_prompt(query: str, evidence: list[ClaimEvidence]) -> str:
         blocks.append("\n".join(lines))
 
     return (
-        "Answer the question using only the evidence below.\n\n"
+        (instruction or _DEFAULT_INSTRUCTION).strip()
+        + "\n\n"
         + "\n\n".join(blocks)
         + f"\n\nQuestion: {query}\nAnswer:"
     )
@@ -111,7 +137,11 @@ def generate_answer(
     """Generate a grounded answer from sufficient evidence."""
     cfg = cfg or default_config()
     generator = generator or Generator(cfg=cfg)
-    text = generator.complete(build_prompt(query, evidence))
+    # A stub generator in tests has no `.style`; fall back to the plain instruction.
+    style = getattr(generator, "style", {})
+    text = generator.complete(
+        build_prompt(query, evidence, instruction=style.get("instruction"))
+    )
     return Answer(
         query=query,
         text=text,

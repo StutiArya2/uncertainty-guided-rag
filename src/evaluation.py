@@ -174,6 +174,7 @@ class SupportEvaluator:
         self.cfg = cfg or default_config()
         self.scorer = scorer or scorer_from_config(self.cfg)
         self.aggregate = self.cfg.get_path("evaluation.aggregate", "max")
+        self.contextualize = bool(self.cfg.get_path("evaluation.contextualize", True))
 
     @property
     def threshold(self) -> float:
@@ -188,7 +189,8 @@ class SupportEvaluator:
         """
         if not units:
             return []
-        return self.scorer.score([contextualize(u) for u in units], claim)
+        premises = [contextualize(u, self.contextualize) for u in units]
+        return self.scorer.score(premises, claim)
 
     def evaluate(self, claim: str, units: list[EvidenceUnit]) -> ClaimVerdict:
         scores = self.score_units(claim, units)

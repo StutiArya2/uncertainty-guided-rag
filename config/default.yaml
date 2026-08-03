@@ -54,6 +54,20 @@ compression:
   # Never drop below this many units for a claim, regardless of confidence.
   floor_units: 1
 
+  # Ablation arms. These exist to answer the question a reviewer asks first:
+  # "you saved tokens by dropping evidence — would dropping a fixed fraction do the
+  # same?" Both keep the SAME fraction on every claim, ignoring uncertainty, so the
+  # only variable is whether the budget is allocated adaptively.
+  #
+  #   fixed_ratio — keeps the top fraction by retrieval score
+  #   random      — keeps a random subset, isolating whether ranking matters at all
+  #
+  # scripts/run_eval.py overrides fixed_keep to match the uncertainty arm's realised
+  # budget, so the arms are compared at equal cost rather than equal settings.
+  fixed_keep: 0.6
+  # Fixed seed so the random arm is reproducible.
+  random_seed: 20260803
+
 evaluation:
   # Which support scorer to use. Both are real options, and switching between them is a
   # planned ablation — see src/evaluation.py for the measurements behind this default.
@@ -66,6 +80,14 @@ evaluation:
   # Claims here come from the query (claims.strategy), so relevance is the default.
   scorer: relevance
 
+  # Prefix each evidence chunk with its document title before scoring. Helps only when
+  # doc ids are short, meaningful concepts. Measured mean best-support, same claims:
+  #     hand-built corpus (24 docs):   with 0.997   without 0.004
+  #     QASPER (110 real papers):      with 0.004   without 0.176
+  # The gain on the hand-built corpus was an artefact of ids we chose ourselves. Set per
+  # corpus; do not assume.
+  contextualize: true
+
   # Evidence units are scored individually and the claim takes the best one. Measured:
   # concatenating a claim's units dropped its score from 0.997 to 0.510, because
   # irrelevant neighbours dilute the signal.
@@ -76,8 +98,21 @@ evaluation:
   scorers:
     relevance:
       model: cross-encoder/ms-marco-MiniLM-L-6-v2
-      # Measured over the 16-question eval set: lowest answerable claim scored 0.205,
-      # highest unanswerable scored 0.001. 0.15 sits inside that gap.
+      # PER-CORPUS. Calibrate with scripts/calibrate_threshold.py; do not carry a value
+      # from one corpus to another. The score scale is not comparable across corpora.
+      #
+      #   hand-built (24 docs): lowest answerable claim 0.205, highest unanswerable
+      #     0.001. 0.15 sits inside that gap, and the README numbers use it.
+      #   QASPER (110 papers): best-support on *answerable* questions has median 0.080 —
+      #     below this threshold. 0.15 abstains on 48% of dev / 54% of test questions the
+      #     paper demonstrably answers. Dev-calibrated value is 0.01; pass it with
+      #     `run_eval.py --support-threshold 0.01`.
+      #
+      # The QASPER curve is a bad trade at every setting: no threshold catches a
+      # meaningful share of unanswerable questions without destroying ~a third of the
+      # answerable ones. Measured separation is weak — the scorer's top-ranked unit is
+      # the one containing the gold answer only 22% of the time (12% would be chance),
+      # and correlation between support score and gold-answer overlap is +0.045.
       threshold: 0.15
     nli:
       model: MoritzLaurer/DeBERTa-v3-large-mnli-fever-anli-ling-wanli
@@ -92,6 +127,41 @@ abstain:
   ambiguous_claim_count: 3
 
 generation:
+  # Fallback cap when a style does not set its own.
   max_new_tokens: 256
   # Greedy by default so runs are reproducible.
   temperature: 0.0
+
+  # Answer style. NOT cosmetic — answer length is scored.
+  #
+  # Answer F1 is unigram overlap, so every word the answer contains that the gold answer
+  # does not is a precision penalty. QASPER gold answers are a median of 7 words ("BERT",
+  # "two", "on Wikipedia"). A correct 40-word prose answer against a 7-word gold caps at
+  # F1 ~0.30 no matter how right it is; measured mean was 0.033, which was mostly reading
+  # verbosity rather than quality.
+  #
+  #   prose      — a few sentences, for a human reading the web UI
+  #   extractive — the shortest span that answers, for benchmark scoring
+  #
+  # Set per consumer: the UI wants prose, run_eval.py --answer-style extractive wants the
+  # short form. Neither is "correct" in general; they are answers to different questions.
+  style: prose
+  styles:
+    prose:
+      system: >-
+        You answer strictly from the evidence provided.
+        Do not add facts that are not in the evidence.
+        Keep the answer to a few sentences.
+      instruction: Answer the question using only the evidence below.
+      max_new_tokens: 256
+    extractive:
+      system: >-
+        You answer strictly from the evidence provided, in as few words as possible.
+        Copy the answer from the evidence verbatim where you can.
+        Give only the answer itself — no restatement of the question, no explanation,
+        no full sentence unless the answer is genuinely a sentence.
+        For a yes/no question answer exactly "Yes" or "No".
+      instruction: >-
+        Answer the question using only the evidence below.
+        Reply with the answer only, in as few words as possible.
+      max_new_tokens: 48
