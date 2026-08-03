@@ -208,6 +208,12 @@ class ArmResult:
     kept_recalls: list[float] = field(default_factory=list)
     retrieval_recalls: list[float] = field(default_factory=list)
     elapsed: float = 0.0
+    # What the saving cost to obtain: scorer forward passes and generator calls. A token
+    # reduction reported without these is only half a cost claim.
+    scorer_calls: int = 0
+    scorer_premises: int = 0
+    generator_calls: int = 0
+    peak_rss_mb: float = 0.0
     rows: list[dict] = field(default_factory=list)
     # Populated when an arm is averaged over several seeds; records the spread so the
     # report can show a distribution rather than implying a single draw is definitive.
@@ -362,6 +368,12 @@ class ArmResult:
                 "total_loss_missed_rate": round(self.total_loss_missed_rate, 4),
             },
             "elapsed_seconds": round(self.elapsed, 1),
+            "cost": {
+                "scorer_calls": self.scorer_calls,
+                "scorer_premises": self.scorer_premises,
+                "generator_calls": self.generator_calls,
+                "peak_rss_mb": round(self.peak_rss_mb, 1),
+            },
             "seed_spread": self.seed_spread,
             "rows": self.rows,
         }
@@ -720,6 +732,11 @@ def run_arm(
     gold_spans = gold_spans or {}
     start = time.time()
 
+    scorer = getattr(pipeline.evaluator, "scorer", None)
+    before_scorer_calls = getattr(scorer, "calls", 0)
+    before_scorer_premises = getattr(scorer, "premises_scored", 0)
+    before_generator_calls = getattr(pipeline.generator, "calls", 0)
+
     for index, item in enumerate(questions):
         query = item["query"]
         answerable = item.get("answerable", True)
@@ -833,7 +850,24 @@ def run_arm(
         )
 
     result.elapsed = time.time() - start
+    result.scorer_calls = getattr(scorer, "calls", 0) - before_scorer_calls
+    result.scorer_premises = getattr(scorer, "premises_scored", 0) - before_scorer_premises
+    result.generator_calls = getattr(pipeline.generator, "calls", 0) - before_generator_calls
+    result.peak_rss_mb = peak_rss_mb()
     return result
+
+
+def peak_rss_mb() -> float:
+    """Process high-water-mark memory. Monotonic, so it is a run-level ceiling, not a
+    per-arm figure — reported once rather than attributed to whichever arm ran last."""
+    try:
+        import resource
+
+        peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # Linux reports kilobytes, macOS bytes.
+        return peak / (1024 * 1024) if sys.platform == "darwin" else peak / 1024
+    except Exception:  # noqa: BLE001
+        return 0.0
 
 
 def print_report(
@@ -903,6 +937,14 @@ def print_report(
     row("false abstain (answerable)", lambda a: a.false_abstain_rate)
     row("correct abstain (unansw.)", lambda a: a.correct_abstain_rate)
     row("elapsed (s)", lambda a: a.elapsed, "{:.1f}")
+    if any(a.scorer_calls for a in arms):
+        # What the token saving cost. `relative` restoration roughly doubles these.
+        row("scorer forward passes", lambda a: a.scorer_calls, "{:d}")
+        row("  premises scored", lambda a: a.scorer_premises, "{:d}")
+        row("generator calls", lambda a: a.generator_calls, "{:d}")
+    if arms and arms[0].peak_rss_mb:
+        print(f"\npeak process memory: {max(a.peak_rss_mb for a in arms):.0f} MB "
+              "(run-level high-water mark, not per arm)")
 
     # A low ceiling means the F1 column is measuring answer length, not answer quality —
     # which is exactly how a real result was nearly misread as total system failure.

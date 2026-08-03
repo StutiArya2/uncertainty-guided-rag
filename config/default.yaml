@@ -28,6 +28,28 @@ retrieval:
   # Embeddings are cached to disk keyed by (model, corpus hash).
   cache_dir: .cache/embeddings
 
+rerank:
+  # SECOND-STAGE REORDERING BEFORE COMPRESSION DECIDES WHAT STAYS.
+  #
+  # Compression keeps the top-ranked units, and "top-ranked" meant bi-encoder cosine — a
+  # first-stage recall signal computed without the query and passage ever meeting. That is
+  # what makes it cheap enough to run over a corpus and what makes it blunt for choosing
+  # between eight candidates.
+  #
+  # The cost is measurable: retrieval surfaces 44-55% of the human-marked answer evidence
+  # but only ~20% survives compression. Much of that is ordering, not aggressiveness.
+  #
+  # Reuses the relevance cross-encoder already loaded for support scoring, so no new
+  # dependency. Costs one extra forward pass per claim over top_k candidates.
+  #
+  # Note it cannot recover evidence retrieval never returned — that is a first-stage
+  # recall problem, addressed by raising retrieval.top_k so the reranker has more to
+  # work with.
+  enabled: false
+  scorer: relevance
+  # Optional model override; defaults to evaluation.scorers.<scorer>.model.
+  model: null
+
 claims:
   # "heuristic" = deterministic rule-based splitter (default, testable, no model call).
   # "llm" = decomposition via the generation model (Fall extension).
@@ -118,6 +140,28 @@ evaluation:
       model: MoritzLaurer/DeBERTa-v3-large-mnli-fever-anli-ling-wanli
       threshold: 0.55
 
+verification:
+  # ANSWER-AWARE GROUNDING CHECK.
+  #
+  # The topical support check asks "is this evidence about the topic?". Measured against
+  # QASPER's human-marked answer evidence, that question barely detects the failure it is
+  # meant to guard: when compression removed every trace of the supporting passage, the
+  # topical check missed 77.9% of cases, once scoring 0.985 on evidence containing none of
+  # it. On-topic neighbours survive the removal of the answer.
+  #
+  # This asks the other question — does the evidence *entail the claims our answer makes*?
+  # It needs a draft answer first, so it costs one extra generation pass per query.
+  #
+  # Enabled via `restoration.policy: answer_aware`.
+  #
+  # NLI, not relevance, and deliberately independent of `evaluation.scorer`: answer claims
+  # are assertions and entailment is the right relation for them, whereas query-derived
+  # claims are topics and relevance is right for those. One model cannot do both on one
+  # scale — see src/evaluation.py for the measurements behind that split.
+  scorer: nli
+  entailment_threshold: 0.5
+  max_claims: 6
+
 restoration:
   # WHICH SIGNAL DECIDES THAT COMPRESSION WENT TOO FAR.
   #
@@ -135,12 +179,27 @@ restoration:
   #   relative — restore when compressed support falls materially below what the FULL
   #              evidence set scores for the same claim. Self-calibrating: it asks whether
   #              compression *changed* anything, which needs no per-corpus threshold.
+  #              Measured: halves the miss rate (77.9% -> 60.3% on total losses).
+  #   answer_aware — draft an answer from the compressed evidence, extract the assertions
+  #              it makes, and restore if any is not entailed by that evidence. The only
+  #              policy that asks about the *answer* rather than about the topic. Costs an
+  #              extra generation pass plus NLI scoring; see the `verification` block.
   #
-  # Costs one extra scoring pass per claim. Reported as an ablation rather than swapped
-  # in silently, since `absolute` is what every result before 2026-08-03 used.
+  # Reported as an ablation rather than swapped in silently, since `absolute` is what
+  # every result before 2026-08-03 used.
   policy: absolute
   # Restore when compressed support drops below this fraction of full-evidence support.
   retain_fraction: 0.9
+
+  # GRADED RESTORATION. 0 = restore everything at once (the original behaviour).
+  # Any positive value reinstates that many of the best-ranked dropped units, re-checks,
+  # and escalates only if still insufficient — with full restoration as the final rung, so
+  # this can never recover less than the all-at-once policy.
+  #
+  # Worth having because restoration fires on a quarter to a half of questions, and each
+  # firing currently surrenders the claim's entire saving including the units that were
+  # correctly dropped.
+  step: 0
 
 abstain:
   # If every retrieved candidate for a claim scores below this, the KB likely lacks the

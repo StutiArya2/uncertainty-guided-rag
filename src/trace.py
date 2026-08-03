@@ -47,6 +47,11 @@ class ClaimTrace:
     is_sufficient: bool = False
     # Populated only when the restoration branch ran.
     restored_support_score: float | None = None
+    # Units reinstated, and what they cost. With graded restoration a claim may recover
+    # only part of its dropped evidence, so charging it the full baseline (as the
+    # all-or-nothing policy implies) would understate the saving it actually kept.
+    n_restored: int = 0
+    restored_tokens: int = 0
     restored_sufficient: bool | None = None
     # The evidence itself, so the record shows *which* sentences were used rather than
     # only how many. Consumed by the web UI to mark up the source passage.
@@ -85,6 +90,12 @@ class PipelineTrace:
     prompt_tokens: int = 0
     prompt_tokens_uncompressed: int = 0
 
+    # Answer-aware verification, when `restoration.policy: answer_aware` is active.
+    # `draft_answer` is the throwaway answer written from compressed evidence purely so
+    # its claims could be checked; the answer finally returned may differ.
+    grounding: dict | None = None
+    draft_answer: str = ""
+
     @property
     def prompt_reduction(self) -> float:
         """The reduction a user actually pays for. Always <= `reduction`."""
@@ -107,8 +118,13 @@ class PipelineTrace:
         """
         total = 0
         for c in self.claims:
-            restored = c.restored_support_score is not None
-            total += c.baseline_tokens if restored else c.compressed_tokens
+            if c.restored_support_score is None:
+                total += c.compressed_tokens
+            elif c.restored_tokens:
+                # Graded restoration: only the units actually reinstated are charged.
+                total += c.restored_tokens
+            else:
+                total += c.baseline_tokens
         return total
 
     @property

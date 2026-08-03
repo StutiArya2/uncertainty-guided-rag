@@ -353,3 +353,63 @@ class TestSeedOverride:
         first = compress([claim_evidence], cfg=cfg, mode="random", seed=7)[0]
         second = compress([claim_evidence], cfg=cfg, mode="random", seed=7)[0]
         assert signature(first.kept) == signature(second.kept)
+
+
+class TestGradedRestoration:
+    """Full restoration is all-or-nothing: the moment anything looks wrong the claim
+    surrenders its entire saving, including the units correctly dropped. Restoration fires
+    on a quarter to a half of QASPER questions, so that is a lot of budget given back on
+    suspicion."""
+
+    def test_partial_restores_only_the_requested_count(self, claim_evidence, cfg):
+        from src.restoration import restore_partial
+
+        compressed = compress([claim_evidence], cfg=cfg)[0]
+        partial = restore_partial(compressed, 1)
+        assert len(partial.units) == len(compressed.kept) + 1
+
+    def test_partial_restores_the_best_dropped_evidence_first(self, claim_evidence, cfg):
+        from src.restoration import restore_partial
+
+        compressed = compress([claim_evidence], cfg=cfg)[0]
+        best_dropped = max(compressed.dropped, key=lambda u: u.retrieval_score)
+        assert best_dropped in restore_partial(compressed, 1).units
+
+    def test_zero_restores_nothing(self, claim_evidence, cfg):
+        from src.restoration import restore_partial
+
+        compressed = compress([claim_evidence], cfg=cfg)[0]
+        assert signature(restore_partial(compressed, 0).units) == signature(compressed.kept)
+
+    def test_partial_never_exceeds_full(self, claim_evidence, cfg):
+        from src.restoration import restore_partial
+
+        compressed = compress([claim_evidence], cfg=cfg)[0]
+        full = restore(compressed)
+        many = restore_partial(compressed, len(compressed.dropped) + 99)
+        assert signature(many.units) == signature(full.units)
+
+    def test_ladder_always_ends_at_full_restoration(self, claim_evidence, cfg):
+        """The guarantee that makes graded restoration safe to adopt: it can never
+        recover less than the policy it replaces, only reach it more cheaply."""
+        from src.restoration import restoration_ladder
+
+        compressed = compress([claim_evidence], cfg=cfg)[0]
+        for step in (1, 2, 3, 99):
+            ladder = restoration_ladder(compressed, step)
+            assert ladder[-1] == len(compressed.dropped), step
+            assert ladder == sorted(ladder)
+
+    def test_ladder_is_empty_when_nothing_was_dropped(self, claim_evidence, cfg):
+        from src.restoration import restoration_ladder
+
+        compressed = compress([claim_evidence], cfg=cfg, mode="identity")[0]
+        assert restoration_ladder(compressed, 2) == []
+
+    def test_partial_restoration_is_still_exactly_reversible(self, claim_evidence, corpus, cfg):
+        """Spans must survive partial restoration — the core guarantee is unconditional."""
+        from src.restoration import restore_partial
+
+        compressed = compress([claim_evidence], cfg=cfg)[0]
+        for unit in restore_partial(compressed, 1).units:
+            assert unit.verify_against(corpus)

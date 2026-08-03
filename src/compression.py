@@ -83,7 +83,9 @@ def _take(
 
 
 def _by_score(item: ClaimEvidence) -> list:
-    return sorted(item.units, key=lambda u: u.retrieval_score, reverse=True)
+    """Rank order. Uses the reranked score when a second stage has run — otherwise a
+    reranker would reorder the candidates and compression would immediately undo it."""
+    return sorted(item.units, key=lambda u: u.rank_score, reverse=True)
 
 
 def _uncertainty_guided(item: ClaimEvidence, cfg: Config) -> CompressedEvidence:

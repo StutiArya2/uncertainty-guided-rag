@@ -27,7 +27,7 @@ def _ordered(units: list[EvidenceUnit]) -> list[EvidenceUnit]:
     """
     return sorted(
         units,
-        key=lambda u: (-u.retrieval_score, u.span.doc_id, u.span.start),
+        key=lambda u: (-u.rank_score, u.span.doc_id, u.span.start),
     )
 
 
@@ -69,6 +69,53 @@ def restore_from_corpus(
         token_count=sum(u.token_count for u in units),
         uncertainty=compressed.uncertainty,
     )
+
+
+def restore_partial(compressed: CompressedEvidence, n: int) -> ClaimEvidence:
+    """Reinstate only the `n` best-ranked dropped units.
+
+    Full restoration is all-or-nothing: the moment anything looks wrong the claim gives
+    back its entire saving, including the units that were correctly dropped. Measured on
+    QASPER, restoration fires on a quarter to a half of questions, so that is a large
+    share of the budget surrendered on suspicion.
+
+    Restoring a few units at a time lets the check run again against a cheaper
+    intermediate, and it only pays for the full set when the cheaper one still fails.
+    Ordering is by retrieval score, so "next best" means the strongest evidence
+    compression chose to discard.
+    """
+    if n <= 0:
+        return ClaimEvidence(
+            claim=compressed.claim,
+            units=list(compressed.kept),
+            token_count=compressed.compressed_token_count,
+            uncertainty=compressed.uncertainty,
+        )
+
+    extra = _ordered(list(compressed.dropped))[:n]
+    units = _ordered(list(compressed.kept) + extra)
+    return ClaimEvidence(
+        claim=compressed.claim,
+        units=units,
+        token_count=sum(u.token_count for u in units),
+        uncertainty=compressed.uncertainty,
+    )
+
+
+def restoration_ladder(compressed: CompressedEvidence, step: int) -> list[int]:
+    """How many units to reinstate at each attempt, ending at everything dropped.
+
+    The last rung is always full restoration, so graded restoration can never recover
+    *less* than the all-at-once policy it replaces — it only reaches the same place more
+    cheaply when an earlier rung suffices.
+    """
+    total = len(compressed.dropped)
+    if total == 0:
+        return []
+    step = max(1, step)
+    rungs = list(range(step, total, step))
+    rungs.append(total)
+    return rungs
 
 
 def restore_all(compressed: list[CompressedEvidence]) -> list[ClaimEvidence]:
