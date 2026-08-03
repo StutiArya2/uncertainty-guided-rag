@@ -650,6 +650,12 @@ def summarise_seeds(draws: list[ArmResult]) -> ArmResult:
 
     The spread across seeds is kept in `seed_spread` so the report can show that random
     selection is being represented by a distribution and not by one lucky or unlucky draw.
+
+    One caveat to state when reporting: averaging over seeds estimates the *expected*
+    behaviour of random selection, which is the right quantity to compare ranking against,
+    but a later paired test treats that average as fixed and so ignores its own sampling
+    error. With 20 seeds that error is small, and `seed_spread` carries the raw range so a
+    reader can judge it rather than take the point estimate on trust.
     """
     if len(draws) == 1:
         return draws[0]

@@ -40,24 +40,42 @@ restriction, the baseline scored ~1% F1 and abstained on 83% of answerable quest
 
 ### What the evidence supports
 
-**1. Ranked selection is worth a large saving at equal answer quality.** At a binding
-budget, ranked selection realises ~53% evidence-token reduction against ~34% for random
-selection at the same nominal budget, with no distinguishable difference in answer F1.
-The mechanism is measured: random drops needed evidence more often, triggers restoration
-more often, and restoration hands the savings back.
+**1. Reversible compression turns selection quality into a cost curve — and the exchange
+rate is set by how well the system detects its own losses.** Ranked selection beats random
+selection at the same nominal budget, and by *twice as much* once the loss detector is
+improved:
 
-**2. Uncertainty-guided allocation adds nothing.** Against a fixed ratio at matched
-budget, the difference is a bounded null at two budget regimes, with the sign flipping
-between them. The founding premise — *confident retrieval implies redundant evidence* — is
-false here: retrieval confidence carries almost no information about whether evidence
-answers the question (top-ranked unit contains the gold answer 22% of the time against a
-12% chance baseline; correlation +0.045).
+| restoration trigger | detector miss rate (random) | ranked − random reduction |
+|---|---|---|
+| `absolute` (topical threshold) | 55.6% | **+14.2 pp** |
+| `relative` (vs full-set support) | 23.2% | **+26.3 pp** |
+
+Random's realised reduction collapses from 39.0% to 17.9% under the better detector — its
+restoration rate rises from 48.8% to 76.0%, so it keeps handing its savings back. Ranked
+selection still returns 44.2%. Clustered over 109 papers, both p=0.0001.
+
+Answer quality is unaffected either way (ranked − random F1: +0.0024, p=0.85). In a
+reversible system, good selection buys **tokens, not accuracy** — which is the point.
+
+**2. Uncertainty-guided allocation adds nothing.** +0.0052 F1 vs a fixed ratio at matched
+budget, clustered CI [−0.0047, +0.0164], p=0.39 — inside the ±0.02 declared in advance, and
+the sign flips at a milder budget. The founding premise (*confident retrieval implies
+redundant evidence*) is false here: retrieval confidence carries almost no information
+about whether evidence answers the question — the top-ranked unit contains the gold answer
+22% of the time against a 12% chance baseline, correlation +0.045.
 
 **3. The restoration trigger misses most losses it exists to catch.** Scored against
-QASPER's human-marked answer evidence, the default `absolute` trigger fails to fire on
-88.9% of questions where compression removed needed evidence — and on 6 of 6 where it
-removed *all* of it. The `relative` trigger roughly halves that, at a real cost in
-savings. This is reported as a finding and an open problem, not hidden.
+QASPER's human-marked answer evidence, `absolute` fails to fire on **76.5%** of questions
+where compression removed needed evidence, and 77.9% where it removed *all* of it.
+`relative` reduces that to 58.8% / 60.3%. Still poor, reported as the open problem rather
+than hidden — and it is now a measurable target where the project previously had an
+untested safety assertion.
+
+**4. An oracle selector says the headroom is in cost and safety, not accuracy.** Keeping
+exactly the human-marked evidence reaches F1 0.1785 against ranked selection's 0.1649 — a
+gap that is not significant (p=0.27). The generator limits answer quality, not the
+selector. But the oracle reaches baseline quality at 48.9% reduction with a **0%** miss
+rate, which is what a detector should be judged against.
 
 ```bash
 # reproduce; every JSON records its own commit, config, dataset and model revisions
@@ -71,14 +89,15 @@ python scripts/make_bundle.py artifacts/qasper-main --check
 
 ### Reading the numbers honestly
 
-- **Two reductions are reported.** Evidence-token reduction, and end-to-end *prompt*-token
-  reduction. The second is lower — the preamble, claim labels, title prefixes, question
-  and chat template do not compress — and only it is a cost claim.
+- **Two reductions are reported, and the smaller one is the real one.** 53.0% of *evidence*
+  tokens is **38.6% of the prompt**: the preamble, claim labels, title prefixes, question
+  and chat template do not compress. Quote the prompt figure.
 - **Intervals are clustered by paper.** Questions from one paper are correlated; treating
   them as independent is pseudo-replication and reports a narrower interval than the data
   supports.
-- **Random is a distribution over 20 seeds**, not one draw. On a smoke test its reduction
-  ranged 34.8–58.0%.
+- **Random is a distribution over 20 seeds**, not one draw. Its reduction ranged
+  **27.8–52.7%** — a single unlucky draw would have put it level with ranked selection.
+  Our own earlier single-seed figure was inflated by 5 points.
 - **Thresholds are per-corpus.** The support threshold calibrated on the hand-built KB
   abstains on ~half of *answerable* QASPER questions. Calibrate with
   `scripts/calibrate_threshold.py`; never carry a threshold between corpora.
