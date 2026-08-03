@@ -2,36 +2,57 @@
 
 Working title:
 
-> **Reversible Evidence Compression for RAG: selection errors become lost savings, and
-> retrieval confidence does not help you avoid them**
+> **Detect your own losses: reversible evidence compression turns selection quality into a
+> cost curve, and retrieval confidence is not the signal you need**
 
-Every number below traces to a run in `artifacts/`. Numbers still marked *(pending)* are
-awaiting the definitive runs; do not quote them until they are filled in from the archived
-JSON.
+All numbers below come from `artifacts/qasper-main/` — 287 QASPER questions over 110
+papers, budgets matched, random averaged over 20 seeds, intervals bootstrapped over papers.
 
 ---
 
 ## The claim we can defend
 
-Three results, in decreasing order of strength:
+**Headline.** Reversible compression converts selection errors into lost savings rather
+than wrong answers — *in proportion to how well the system detects those errors*. Improve
+the detector and the value of good selection roughly doubles:
 
-1. **Ranked extractive selection is worth a large, significant saving at equal answer
-   quality.** At a binding budget, ranked selection realises ~53% evidence-token reduction
-   against ~34% for random, with no distinguishable difference in answer F1. The mechanism
-   is measured, not asserted: random selection drops needed evidence more often, triggers
-   restoration more often, and restoration hands the savings back.
+| restoration trigger | detector miss rate (random) | ranked − random reduction |
+|---|---|---|
+| `absolute` (topical threshold) | 55.6% | **+14.2 pp** |
+| `relative` (vs full-set support) | 23.2% | **+26.3 pp** |
 
-2. **Uncertainty-guided allocation adds nothing over a uniform budget.** Bounded null at
-   two budget regimes, with the sign flipping between them. The founding premise —
-   *confident retrieval implies redundant evidence* — is false here, and we can say why:
-   retrieval confidence carries almost no information about whether the evidence answers
-   the question (top-ranked unit contains the gold answer 22% of the time against a 12%
-   chance baseline; correlation +0.045).
+Random's realised reduction collapses from 39.0% to 17.9% under the better detector,
+because its restoration rate rises from 48.8% to 76.0%. Ranked selection still returns
+44.2%. Per question, clustered over 109 papers: +19.4 pp (CI [+15.3, +23.6]) and +31.6 pp
+(CI [+24.6, +38.5]), both p=0.0001.
 
-3. **The restoration trigger misses most of the losses it exists to catch.** Against
-   human-marked evidence, the absolute trigger fails to fire on 88.9% of questions where
-   compression removed needed evidence, and on 6 of 6 where it removed all of it. A
-   relative trigger roughly halves this. Reported as a finding and an open problem.
+Supporting results:
+
+1. **Ranking buys tokens, not accuracy.** Ranked vs random answer F1: +0.0024,
+   CI [−0.0230, +0.0265], p=0.85. In a reversible system that is the expected shape — good
+   selection should show up in cost.
+
+2. **Uncertainty-guided allocation adds nothing.** +0.0052 F1 vs a fixed ratio,
+   clustered CI [−0.0047, +0.0164], p=0.39, at a matched budget; and the sign flips between
+   budget regimes. Bounded well inside the ±0.02 declared in advance. The founding
+   premise — *confident retrieval implies redundant evidence* — is false here: retrieval
+   confidence carries almost no information about whether evidence answers the question
+   (top-ranked unit contains the gold answer 22% of the time vs 12% chance; correlation
+   +0.045).
+
+3. **The detector misses most losses.** Against human-marked evidence, `absolute` fails to
+   fire on 76.5% of questions where compression dropped needed evidence, and on 77.9% of
+   those where it dropped *all* of it. `relative` reduces this to 58.8% / 60.3%. Still bad;
+   reported as the project's open problem.
+
+4. **The oracle says the headroom is in cost, not quality.** Perfect selection reaches
+   F1 0.1785 vs ranked 0.1649 — a gap that is not significant (CI [−0.0100, +0.0371],
+   p=0.27). The generator, not the selector, limits answer quality. But the oracle hits
+   baseline quality at 48.9% reduction with a **0%** dangerous-miss rate, which is the
+   target a detector should be measured against.
+
+5. **Compression is quality-neutral.** identity − uncertainty_guided: +0.0120 F1,
+   CI [−0.0171, +0.0410], p=0.42.
 
 ## What we must not claim
 
@@ -100,31 +121,56 @@ Design decisions worth defending in text:
 
 ### 5. Results
 
-#### 5.1 Cost — report both numbers
+#### 5.1 Cost — lead with the prompt number
 
-Evidence-token reduction and **end-to-end prompt-token reduction**. The latter is lower:
-the preamble, per-claim labels, title prefixes, question and chat template do not compress.
-Only the second is a cost claim.
+**53.0% of evidence tokens is 38.6% of the prompt.** The preamble, per-claim labels, title
+prefixes, question and chat template do not compress. Report both; only the second is a
+cost claim, and it is the one to put in the abstract.
 
-#### 5.2 The ablation
+`absolute` policy, tight budget (`artifacts/qasper-main/tight_absolute.json`):
 
-Uncertainty vs fixed at matched budget, both regimes, clustered CIs. *(pending)*
+| arm | evidence red. | **prompt red.** | F1 | restoration | gold kept | dangerous miss |
+|---|---|---|---|---|---|---|
+| identity | 0.0% | 0.0% | 0.1769 | 0.0% | 55.1% | — |
+| uncertainty_guided | 53.0% | 38.6% | 0.1649 | 29.6% | 24.0% | 76.5% |
+| fixed_ratio | 53.2% | 38.7% | 0.1597 | 31.4% | 22.3% | 72.0% |
+| random ×20 | 39.0% | 28.5% | 0.1561 | 48.8% | 13.4% | 55.6% |
+| oracle | 48.9% | 35.9% | 0.1785 | 41.1% | 55.1% | 0.0% |
 
-#### 5.3 Ranking, and the mechanism
+#### 5.2 The ablation — adaptivity does nothing
 
-Ranked vs random: reduction, restoration rate, F1. The causal chain from dropped evidence
-→ restoration → forfeited savings. *(pending)*
++0.0052 F1, clustered CI [−0.0047, +0.0164], p=0.39, 109 papers, budgets matched to 0.4%.
+Sign flips at the milder budget. Bounded inside the ±0.02 declared in advance, so this is a
+**null with a bound**, not an underpowered shrug — and `run_eval.py` refuses to declare one
+below n=100.
 
-#### 5.4 Evidence-level safety — the new contribution
+#### 5.3 Ranking and the detector — the headline
 
-Against human-marked evidence: gold-evidence recall before restoration, restoration
-detector recall, and the **dangerous false-negative rate**. Absolute vs relative trigger.
-*(pending)*
+The table in "The claim we can defend". Causal chain: poor selection → dropped evidence →
+detector fires → restoration → forfeited saving. Each link measured. The comparison across
+the two triggers is what isolates the detector's role.
+
+#### 5.4 Evidence-level safety
+
+Against human-marked evidence: gold-evidence recall before restoration (55.1% retrieved →
+24.0% surviving compression), detector recall, and the **dangerous false-negative rate**
+(76.5% `absolute`, 58.8% `relative`). Restricted to total losses: 77.9% and 60.3%.
+
+Alignment succeeds on 83.9% of marked passages; 9.8% are table/figure captions absent from
+a text-only corpus and are excluded rather than scored as compression failures.
 
 #### 5.5 Oracle ceiling
 
-How much of the achievable saving ranked selection captures. Without this, "53%" has no
-scale. *(pending)*
+F1 0.1785 at 48.9% reduction with 0% dangerous misses. The quality gap to ranked selection
+is not significant (p=0.27) — so the remaining headroom is in **cost and safety**, not
+accuracy, and the generator limits quality regardless of selection.
+
+#### 5.6 Seed sensitivity
+
+Across 20 seeds the random arm's reduction ranged **27.8% – 52.7%**. A single unlucky draw
+would have put random level with ranked selection. Our own earlier single-seed aggregate
+(19.1 pp) was inflated; the true aggregate is 14.2 pp. Report distributions for stochastic
+baselines.
 
 ### 6. Limitations — write these, do not let a reviewer find them
 

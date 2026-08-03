@@ -119,6 +119,11 @@ only legitimate if it can be undone exactly. If it fails, nothing downstream is 
   `pytest`. Ask before introducing anything else (LangChain, LlamaIndex, FAISS,
   sentence-transformers) — FAISS and sentence-transformers were evaluated and dropped
   on purpose, not overlooked
+- **Verify large model downloads by sha256, never by file size.** Twice now a Qwen 1.5B
+  download has ended as a file of *exactly* the right size (3 087 467 144 bytes) with the
+  wrong contents. HF's resume logic sees a complete file and never re-fetches, so the
+  download sits at 0% CPU forever and no error is ever printed. The blob filename is its
+  expected sha256 — compare against it, and delete the `.incomplete` blob before retrying
 - Flag anywhere token-count assumptions (high-token vs reduced-token) aren't made explicit
   in code. `tokens.py` reports `is_exact`; a reduction measured with estimated counts must
   say so
