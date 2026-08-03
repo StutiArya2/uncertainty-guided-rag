@@ -78,6 +78,12 @@ def hash_corpus(kb_path: str | Path) -> dict:
     except Exception:  # noqa: BLE001
         return {"path": str(kb_path), "n_documents": None, "manifest_sha256": None}
 
+    if not files:
+        # Do NOT hash the empty list. It would produce the sha256 of the empty string —
+        # a real-looking digest, identical for every missing or mistyped path, which is
+        # exactly the kind of plausible-but-wrong metadata provenance exists to prevent.
+        return {"path": str(kb_path), "n_documents": 0, "manifest_sha256": None}
+
     lines = [f"{p.name}:{sha256_file(p)}" for p in files]
     manifest = hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
     return {

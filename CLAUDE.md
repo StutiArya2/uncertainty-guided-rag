@@ -67,6 +67,22 @@ measurements are recorded in the relevant module docstring.
   dilutes the signal (0.997 → 0.510).
 - **`identity` compression mode is not dead code.** It is the no-compression baseline arm
   that `scripts/run_eval.py` measures reduction against.
+- **Restoration and abstention are different questions and now use different signals.**
+  `restoration.policy: absolute` fires when compressed support falls under the abstain
+  threshold; measured against human-marked evidence it misses **88.9%** of real losses,
+  and 6 of 6 total losses, because the support signal is topical and dropping the answer
+  sentence leaves other on-topic sentences scoring just as high. `relative` compares
+  against the full evidence set's own score, halves the miss rate, and needs no
+  per-corpus constant. Both are kept: `absolute` is what every result before 2026-08-03
+  used.
+- **Gold evidence is evaluation-only.** `src/gold_evidence.py` must never be imported by
+  a pipeline module — `tests/test_gold_evidence.py` enforces it. The `oracle` compression
+  mode is the one deliberate exception, it requires spans passed explicitly, and it is a
+  headroom measurement, never a configuration.
+- **Two token numbers, and only one is a cost claim.** `final_tokens` counts evidence text;
+  `prompt_tokens` counts what the model actually received, chat template included. The
+  scaffolding does not compress, so `prompt_reduction` is always lower and is the honest
+  figure.
 
 ## Conventions
 
@@ -115,3 +131,13 @@ only legitimate if it can be undone exactly. If it fails, nothing downstream is 
   was read as "compression makes no difference"; the real cause was that 80% of questions
   abstained, and every arm emits the same refusal text. Check the arms actually diverge
   before reading a verdict off them
+- **Never measure a component with its own output.** "Restoration recovered every
+  question" was inferred from abstention rates matching — but abstention is decided by the
+  same support scorer whose blind spot was the thing being tested. Safety claims need an
+  external label; here that is QASPER's evidence annotations
+- **Report cost and quality against clustered intervals.** Questions from one paper are
+  correlated. `cluster_bootstrap` and `cluster_permutation_p` in `run_eval.py` resample
+  papers; the naive per-question interval is reported alongside but is not the verdict
+- **Any experiment whose numbers may be quoted must write `--json` into `artifacts/`.**
+  Provenance is embedded automatically; `scripts/make_bundle.py --check` fails a run made
+  from a dirty tree
