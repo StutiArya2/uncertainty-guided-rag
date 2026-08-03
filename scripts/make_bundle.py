@@ -70,10 +70,10 @@ def summarise(path: Path, run: dict) -> list[str]:
             "",
         ]
     else:
-        dirty = git.get("dirty")
+        dirty = git.get("dirty_inputs", git.get("dirty"))
         lines += [
             f"- commit: `{git.get('commit') or 'unknown'}`"
-            + ("  **(dirty tree — not reproducible from this commit)**" if dirty else ""),
+            + ("  **(modified sources — not reproducible from this commit)**" if dirty else ""),
             f"- run at: {prov.get('timestamp_utc', 'unknown')}",
             f"- device: {prov.get('device', 'unknown')}",
             "",
@@ -125,9 +125,17 @@ def main(argv: list[str] | None = None) -> int:
         if not prov:
             problems.append(f"{path.name}: no provenance recorded")
             continue
-        if (prov.get("git") or {}).get("dirty"):
-            problems.append(f"{path.name}: produced from a dirty working tree")
-        if (prov.get("git") or {}).get("commit") is None:
+        git = prov.get("git") or {}
+        # Only modified *inputs* break reproducibility. Runs write into artifacts/, so
+        # every experiment after the first in a session sees the previous one's output
+        # sitting uncommitted; failing on that would make the check meaningless noise.
+        dirty_inputs = git.get("dirty_inputs")
+        if dirty_inputs is None:
+            dirty_inputs = git.get("dirty")  # older records predate the distinction
+        if dirty_inputs:
+            files = ", ".join(git.get("dirty_input_files") or git.get("dirty_files") or [])
+            problems.append(f"{path.name}: produced from modified sources ({files})")
+        if git.get("commit") is None:
             problems.append(f"{path.name}: no commit recorded")
 
     for problem in problems:

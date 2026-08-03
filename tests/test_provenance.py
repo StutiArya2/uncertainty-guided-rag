@@ -15,6 +15,7 @@ from pathlib import Path
 
 from src.config import load_config
 from src.provenance import (
+    _is_input,
     collect,
     dataset_record,
     environment,
@@ -92,8 +93,40 @@ class TestDatasetIdentity:
 
 class TestGitState:
     def test_reports_dirtiness_explicitly(self):
-        """`dirty` matters more than the commit: a result from an edited tree is not
+        """`dirty_inputs` matters more than the commit: a result from edited code is not
         reproducible from that commit, and the bundle has to say so."""
         state = git_state()
-        assert set(state) >= {"commit", "branch", "dirty", "dirty_files"}
+        assert set(state) >= {"commit", "branch", "dirty", "dirty_inputs", "dirty_files"}
         assert state["dirty"] in (True, False, None)
+
+
+class TestInputClassification:
+    """Runs write their JSON into artifacts/, so a sequence of experiments dirties the
+    tree for every run after the first. Counting that as "not reproducible" would make the
+    check fire on every real session — and a safeguard that always fires gets ignored."""
+
+    def test_source_changes_count(self):
+        for line in (
+            " M src/pipeline.py",
+            "?? scripts/new_experiment.py",
+            " M config/default.yaml",
+            " M data/qasper/questions.yaml",
+            " M requirements.txt",
+        ):
+            assert _is_input(line), line
+
+    def test_result_files_do_not_count(self):
+        for line in (
+            " M artifacts/qasper-main/tight_absolute.json",
+            "?? artifacts/qasper-main/README.md",
+            " M README.md",
+            " M docs/PAPER-OUTLINE.md",
+        ):
+            assert not _is_input(line), line
+
+    def test_rename_is_judged_by_its_destination(self):
+        assert _is_input('R  docs/old.py -> src/pipeline.py')
+        assert not _is_input('R  src/old.py -> artifacts/dead.json')
+
+    def test_quoted_paths_with_spaces_are_handled(self):
+        assert _is_input(' M "src/some file.py"')

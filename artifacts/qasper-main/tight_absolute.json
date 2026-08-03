@@ -1,14 +1,12 @@
 {
   "provenance": {
-    "timestamp_utc": "2026-08-03T11:30:15+00:00",
+    "timestamp_utc": "2026-08-03T14:06:32+00:00",
     "command": "python scripts/run_eval.py --questions data/qasper/questions.yaml --kb data/qasper/kb --no-contextualize --answer-style extractive --support-threshold 0.01 --set compression.max_keep=0.45 --set compression.min_keep=0.1 --modes identity uncertainty_guided fixed_ratio random oracle --random-seeds 20 --json artifacts/qasper-main/tight_absolute.json",
     "git": {
-      "commit": "5b2fe5af3dc4fd1cd7cc95c908c4e7e97eeebf00",
+      "commit": "85691213fed72666fbd338098134816a703db003",
       "branch": "research/qasper-ablation",
-      "dirty": true,
-      "dirty_files": [
-        "M scripts/run_eval.py"
-      ]
+      "dirty": false,
+      "dirty_files": []
     },
     "models": {
       "embedding": {
@@ -156,7 +154,7 @@
         "lost_completely_missed": 0,
         "total_loss_missed_rate": 0.0
       },
-      "elapsed_seconds": 119.4,
+      "elapsed_seconds": 96.3,
       "seed_spread": null,
       "rows": [
         {
@@ -8472,7 +8470,7 @@
         "lost_completely_missed": 53,
         "total_loss_missed_rate": 0.7794
       },
-      "elapsed_seconds": 102.7,
+      "elapsed_seconds": 68.6,
       "seed_spread": null,
       "rows": [
         {
@@ -16788,7 +16786,7 @@
         "lost_completely_missed": 52,
         "total_loss_missed_rate": 0.7123
       },
-      "elapsed_seconds": 87.3,
+      "elapsed_seconds": 66.7,
       "seed_spread": null,
       "rows": [
         {
@@ -25104,7 +25102,7 @@
         "lost_completely_missed": 50,
         "total_loss_missed_rate": 0.5263
       },
-      "elapsed_seconds": 1853.1,
+      "elapsed_seconds": 7214.8,
       "seed_spread": {
         "n_seeds": 20,
         "reduction": [
@@ -33488,7 +33486,7 @@
         "lost_completely_missed": 0,
         "total_loss_missed_rate": 0.0
       },
-      "elapsed_seconds": 89.6,
+      "elapsed_seconds": 63.9,
       "seed_spread": null,
       "rows": [
         {

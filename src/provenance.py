@@ -36,19 +36,44 @@ def _run(args: list[str]) -> str | None:
         return None
 
 
+# Paths whose contents determine a result. Anything else in the tree may be modified
+# without affecting whether a run can be reproduced from its commit.
+INPUT_PREFIXES = ("src/", "scripts/", "config/", "data/", "tests/", "requirements.txt")
+
+
+def _is_input(status_line: str) -> bool:
+    """Whether a `git status --porcelain` line names something a result depends on.
+
+    The distinction is load-bearing. Runs write their JSON into `artifacts/`, so a
+    sequence of experiments inevitably dirties the tree for every run after the first —
+    and treating that as "not reproducible" would make the checker cry wolf on every real
+    experiment session, which is how a safeguard gets ignored.
+    """
+    path = status_line[3:].strip().strip('"')
+    # Renames appear as "old -> new"; the destination is what matters.
+    if " -> " in path:
+        path = path.split(" -> ", 1)[1]
+    return path.startswith(INPUT_PREFIXES)
+
+
 def git_state() -> dict:
     """Commit, branch, and whether the tree was dirty when the run started.
 
-    `dirty` matters more than the commit: a result produced from an edited tree is not
-    reproducible from that commit, and saying so is the difference between a bundle a
-    reviewer can trust and one they cannot.
+    `dirty_inputs` matters more than the commit: a result produced from edited *code* is
+    not reproducible from that commit, and saying so is the difference between a bundle a
+    reviewer can trust and one they cannot. `dirty` covers the whole tree and is kept for
+    completeness, but it is `dirty_inputs` that should gate certification.
     """
     status = _run(["git", "status", "--porcelain"])
+    lines = status.splitlines() if status else []
+    inputs = [line for line in lines if _is_input(line)]
     return {
         "commit": _run(["git", "rev-parse", "HEAD"]),
         "branch": _run(["git", "rev-parse", "--abbrev-ref", "HEAD"]),
         "dirty": bool(status) if status is not None else None,
-        "dirty_files": status.splitlines() if status else [],
+        "dirty_inputs": bool(inputs) if status is not None else None,
+        "dirty_files": lines,
+        "dirty_input_files": inputs,
     }
 
 
