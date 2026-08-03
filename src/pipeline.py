@@ -27,7 +27,7 @@ from .compression import compress, to_claim_evidence
 from .config import Config, default_config
 from .evaluation import SupportEvaluator
 from .evidence_mapping import map_evidence
-from .generation import Generator, abstain, generate_answer
+from .generation import Generator, abstain, build_prompt, generate_answer
 from .restoration import restore
 from .retrieval import Retriever
 from .tokens import TokenCounter, shared_counter
@@ -98,16 +98,87 @@ class Pipeline:
             "Evidence was retrieved but did not support the question."
         )
 
+    def _should_restore(self, comp, original: ClaimEvidence, verdict) -> bool:
+        """Decide whether compression removed something this claim needed.
+
+        `absolute` asks whether the compressed evidence clears the abstain threshold.
+        That conflates two questions — "is this claim supportable at all?" and "did
+        compression break it?" — and answers the second badly: the support signal is
+        topical, so removing the one sentence carrying the answer usually leaves enough
+        on-topic text to keep the score high. Measured on QASPER, it fired on 0 of 6
+        cases where compression removed every trace of the marked answer evidence.
+
+        `relative` compares against the full evidence set's own score, asking whether
+        compression *changed* the support rather than whether the result clears some
+        absolute bar. Self-calibrating, and it needs no per-corpus constant.
+        """
+        if not comp.dropped:
+            # Nothing was removed, so there is nothing to put back regardless of policy.
+            return False
+
+        policy = self.cfg.get_path("restoration.policy", "absolute")
+        if policy == "absolute":
+            return not verdict.is_sufficient
+
+        if policy != "relative":
+            raise ValueError(
+                f"unknown restoration.policy {policy!r}; expected 'absolute' or 'relative'"
+            )
+
+        full = self.evaluator.evaluate(comp.claim, original.units)
+        if full.support_score <= 0.0:
+            # The full set supports nothing either, so compression cannot be the cause.
+            # Fall back to the absolute test rather than restoring on a meaningless ratio.
+            return not verdict.is_sufficient
+
+        retain = float(self.cfg.get_path("restoration.retain_fraction", 0.9))
+        return verdict.support_score < retain * full.support_score
+
+    def _record_prompt_cost(
+        self,
+        trace: PipelineTrace,
+        query: str,
+        final_evidence: list[ClaimEvidence],
+        full_evidence: list[ClaimEvidence],
+    ) -> None:
+        """Measure the real prompt, and the prompt the baseline would have sent.
+
+        Best-effort: a stub generator in tests has no tokenizer, and a provenance-style
+        measurement must never be the reason an experiment dies. Zeros mean "not
+        measured", and `prompt_reduction` returns 0.0 rather than inventing a ratio.
+        """
+        counter = getattr(self.generator, "count_prompt_tokens", None)
+        if counter is None:
+            return
+        style = getattr(self.generator, "style", {})
+        instruction = style.get("instruction") if isinstance(style, dict) else None
+        try:
+            trace.prompt_tokens = counter(
+                build_prompt(query, final_evidence, instruction=instruction)
+            )
+            trace.prompt_tokens_uncompressed = counter(
+                build_prompt(query, full_evidence, instruction=instruction)
+            )
+        except Exception:  # noqa: BLE001 - measurement must not break the run
+            logger.debug("prompt token measurement failed", exc_info=True)
+
     def run(
         self,
         query: str,
         compression_mode: str | None = None,
         restrict_to: str | None = None,
+        oracle_spans: set | None = None,
+        seed: int | None = None,
     ) -> tuple[Answer, PipelineTrace]:
         """Run one query end to end, returning the answer and its trace.
 
         `restrict_to` confines retrieval to a single document, for single-paper
         benchmarks where the question is only meaningful relative to a given paper.
+
+        `oracle_spans` and `seed` exist for the evaluation harness only. `oracle_spans`
+        carries human-marked answer evidence and is rejected by every mode except
+        `oracle`, so it cannot leak into a measured system by accident; `seed` lets the
+        random arm be run many times instead of once.
         """
         trace = PipelineTrace(query=query, token_counts_exact=self.counter.is_exact)
 
@@ -119,7 +190,13 @@ class Pipeline:
         )
 
         # Stage 4: compression (uncertainty is estimated and stored inside).
-        compressed = compress(evidence, cfg=self.cfg, mode=compression_mode)
+        compressed = compress(
+            evidence,
+            cfg=self.cfg,
+            mode=compression_mode,
+            oracle_spans=oracle_spans,
+            seed=seed,
+        )
 
         # Stages 5-6: evaluate, and restore only the claims that failed.
         final_evidence: list[ClaimEvidence] = []
@@ -145,7 +222,7 @@ class Pipeline:
             claim_trace.support_score = verdict.support_score
             claim_trace.is_sufficient = verdict.is_sufficient
 
-            if not verdict.is_sufficient and comp.dropped:
+            if self._should_restore(comp, original, verdict):
                 # Stage 6.1 + 6.2 — restore this claim and re-check.
                 restoration_triggered = True
                 current = restore(comp)
@@ -159,6 +236,12 @@ class Pipeline:
 
         trace.restoration_triggered = restoration_triggered
         unsupported = [v.claim for v in verdicts if not v.is_sufficient]
+
+        # End-to-end prompt cost, measured against the same prompt built from the *full*
+        # evidence. Both are needed: the difference between them is the reduction actually
+        # paid for, as opposed to the reduction in evidence text, which ignores every
+        # incompressible part of the prompt.
+        self._record_prompt_cost(trace, query, final_evidence, evidence)
 
         # Stage 7: generate, or abstain.
         if unsupported:

@@ -64,6 +64,25 @@ class Generator:
             self._torch = torch
         return self._model, self._tokenizer
 
+    def count_prompt_tokens(self, prompt: str) -> int:
+        """Tokens in the prompt as the model receives it, chat template included.
+
+        Counting the evidence text alone understates the bill by everything that wraps it:
+        the system turn, the role markers, the instruction, the per-claim labels and the
+        question. None of that shrinks when evidence is compressed, so a reduction
+        measured on evidence only is not the reduction anyone pays.
+        """
+        _, tokenizer = self._load()
+        text = tokenizer.apply_chat_template(
+            [
+                {"role": "system", "content": self.style["system"]},
+                {"role": "user", "content": prompt},
+            ],
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+        return len(tokenizer(text)["input_ids"])
+
     def complete(self, prompt: str, max_new_tokens: int | None = None) -> str:
         """Run the chat template over a single user turn and return the reply."""
         model, tokenizer = self._load()

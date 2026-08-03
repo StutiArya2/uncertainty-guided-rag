@@ -200,3 +200,87 @@ class TestBaselineMode:
         )
         assert trace.reduction == 0.0
         assert trace.claims[0].n_dropped == 0
+
+
+def with_policy(cfg, policy, retain_fraction=0.9):
+    cfg["restoration"] = dict(
+        cfg.get("restoration", {}), policy=policy, retain_fraction=retain_fraction
+    )
+    return cfg
+
+
+class TestRestorationPolicy:
+    """Restoration and abstention were decided by one threshold. They answer different
+    questions, and the shared signal answered the restoration one badly: measured on
+    QASPER it fired on 0 of 6 cases where compression removed every trace of the marked
+    answer evidence."""
+
+    def test_unknown_policy_fails_loudly(self, cfg, units):
+        pipeline, _, _ = build(with_policy(cfg, "nonsense"), units, scores=[0.10, 0.95])
+        with pytest.raises(ValueError, match="unknown restoration.policy"):
+            pipeline.run("What is the boiling point of water?")
+
+    def test_identity_never_restores_under_either_policy(self, cfg, units):
+        """Nothing was dropped, so there is nothing to put back — and the relative test
+        must not be allowed to fire on a set it never compressed."""
+        for policy in ("absolute", "relative"):
+            pipeline, _, _ = build(
+                with_policy(cfg, policy), units, scores=[0.01, 0.99, 0.99]
+            )
+            _, trace = pipeline.run(
+                "What is the boiling point of water?", compression_mode="identity"
+            )
+            assert not trace.restoration_triggered, policy
+
+    def test_relative_restores_when_support_falls_against_the_full_set(self, cfg, units):
+        # compressed 0.50, full 1.00 -> 0.50 < 0.9 * 1.00, so restore; then 0.95 passes.
+        pipeline, _, _ = build(
+            with_policy(cfg, "relative"), units, scores=[0.50, 1.00, 0.95]
+        )
+        _, trace = pipeline.run("What is the boiling point of water?")
+        assert trace.restoration_triggered
+
+    def test_relative_leaves_a_near_lossless_compression_alone(self, cfg, units):
+        # compressed 0.98 against full 1.00 -> above the 0.9 retention bar.
+        pipeline, _, _ = build(
+            with_policy(cfg, "relative"), units, scores=[0.98, 1.00]
+        )
+        _, trace = pipeline.run("What is the boiling point of water?")
+        assert not trace.restoration_triggered
+
+    def test_relative_catches_the_drop_absolute_misses(self, cfg, units):
+        """The failure this policy exists for.
+
+        Compressed support is 0.60 — far above the abstain threshold, so `absolute` sees
+        a healthy claim and never restores. But the full evidence scored 1.00, meaning
+        compression removed 40% of the support. `relative` sees that; `absolute` cannot.
+        """
+        absolute, _, _ = build(with_policy(cfg, "absolute"), units, scores=[0.60])
+        _, absolute_trace = absolute.run("What is the boiling point of water?")
+        assert not absolute_trace.restoration_triggered
+
+        relative, _, _ = build(
+            with_policy(cfg, "relative"), units, scores=[0.60, 1.00, 0.99]
+        )
+        _, relative_trace = relative.run("What is the boiling point of water?")
+        assert relative_trace.restoration_triggered
+
+    def test_relative_falls_back_when_the_full_set_supports_nothing(self, cfg, units):
+        """A zero-support claim would make the ratio meaningless; restoring on it would
+        pay full token cost to recover evidence that never helped."""
+        pipeline, _, _ = build(
+            with_policy(cfg, "relative"), units, scores=[0.0, 0.0, 0.0]
+        )
+        answer, trace = pipeline.run("What is the boiling point of water?")
+        assert answer.abstained
+
+    def test_relative_costs_an_extra_scoring_pass(self, cfg, units):
+        """Stated so the cost is visible: the policy is not free."""
+        absolute, abs_eval, _ = build(with_policy(cfg, "absolute"), units, scores=[0.95])
+        absolute.run("What is the boiling point of water?")
+
+        relative, rel_eval, _ = build(
+            with_policy(cfg, "relative"), units, scores=[0.95, 1.00]
+        )
+        relative.run("What is the boiling point of water?")
+        assert rel_eval.calls > abs_eval.calls

@@ -247,3 +247,109 @@ class TestClaimEvidenceView:
         assert view.units == compressed.kept
         assert view.token_count == compressed.compressed_token_count
         assert view.claim == compressed.claim
+
+
+class TestFixedTokenBudget:
+    """Budgeting in units lets a claim with long chunks quietly spend more than one with
+    short chunks. A cost-constrained deployment would budget in tokens; so does this arm."""
+
+    def test_respects_the_token_budget(self, claim_evidence, cfg):
+        cfg["compression"] = dict(cfg["compression"], token_budget=12)
+        compressed = compress([claim_evidence], cfg=cfg, mode="fixed_tokens")[0]
+        assert compressed.compressed_token_count <= 12
+
+    def test_keeps_the_highest_ranked_evidence(self, claim_evidence, cfg):
+        cfg["compression"] = dict(cfg["compression"], token_budget=12)
+        compressed = compress([claim_evidence], cfg=cfg, mode="fixed_tokens")[0]
+        best = max(claim_evidence.units, key=lambda u: u.retrieval_score)
+        assert best in compressed.kept
+
+    def test_always_keeps_the_floor_even_under_a_tiny_budget(self, claim_evidence, cfg):
+        """A claim with no evidence at all cannot be evaluated; the floor prevents it."""
+        cfg["compression"] = dict(cfg["compression"], token_budget=1)
+        compressed = compress([claim_evidence], cfg=cfg, mode="fixed_tokens")[0]
+        assert len(compressed.kept) >= 1
+
+    def test_round_trip_still_exact(self, claim_evidence, corpus, cfg):
+        cfg["compression"] = dict(cfg["compression"], token_budget=12)
+        compressed = compress([claim_evidence], cfg=cfg, mode="fixed_tokens")[0]
+        assert signature(restore(compressed).units) == signature(
+            restore_from_corpus(compressed, corpus).units
+        )
+
+
+class TestOracleArm:
+    """The oracle reads the answer key. It measures headroom and cannot be deployed, so
+    the tests here are as much about preventing misuse as about behaviour."""
+
+    def test_requires_explicit_spans(self, claim_evidence, cfg):
+        """Silently degrading to another policy would report a ceiling that is not one."""
+        with pytest.raises(ValueError, match="oracle mode requires oracle_spans"):
+            compress([claim_evidence], cfg=cfg, mode="oracle")
+
+    def test_keeps_only_units_overlapping_marked_evidence(self, claim_evidence, cfg):
+        target = claim_evidence.units[1]
+        spans = {(target.span.doc_id, target.span.start, target.span.end)}
+        compressed = compress(
+            [claim_evidence], cfg=cfg, mode="oracle", oracle_spans=spans
+        )[0]
+        assert target in compressed.kept
+        assert all(u.span.doc_id == target.span.doc_id for u in compressed.kept)
+
+    def test_partial_overlap_counts_as_a_hit(self, claim_evidence, cfg):
+        """Marked evidence is paragraph-level and chunks are sentences, so a chunk
+        typically covers only part of a marked span."""
+        target = claim_evidence.units[0]
+        spans = {(target.span.doc_id, target.span.start + 1, target.span.end + 500)}
+        compressed = compress(
+            [claim_evidence], cfg=cfg, mode="oracle", oracle_spans=spans
+        )[0]
+        assert target in compressed.kept
+
+    def test_falls_back_rather_than_keeping_nothing(self, claim_evidence, cfg):
+        """An empty oracle would score zero and misreport the ceiling as unreachable."""
+        compressed = compress(
+            [claim_evidence], cfg=cfg, mode="oracle",
+            oracle_spans={("no_such_doc", 0, 10)},
+        )[0]
+        assert len(compressed.kept) == 1
+
+    def test_round_trip_still_exact(self, claim_evidence, corpus, cfg):
+        target = claim_evidence.units[1]
+        spans = {(target.span.doc_id, target.span.start, target.span.end)}
+        compressed = compress(
+            [claim_evidence], cfg=cfg, mode="oracle", oracle_spans=spans
+        )[0]
+        assert signature(restore(compressed).units) == signature(
+            restore_from_corpus(compressed, corpus).units
+        )
+
+    def test_oracle_spans_are_rejected_by_every_other_mode(self, claim_evidence, cfg):
+        """The answer key must not influence a mode that claims not to see it."""
+        target = claim_evidence.units[1]
+        spans = {(target.span.doc_id, target.span.start, target.span.end)}
+        for mode in ("identity", "uncertainty_guided", "fixed_ratio", "random"):
+            with_key = compress(
+                [claim_evidence], cfg=cfg, mode=mode, oracle_spans=spans
+            )[0]
+            without = compress([claim_evidence], cfg=cfg, mode=mode)[0]
+            assert signature(with_key.kept) == signature(without.kept), mode
+
+
+class TestSeedOverride:
+    def test_different_seeds_select_differently(self, claim_evidence, cfg):
+        """Multi-seed reporting is only meaningful if the seed actually changes the draw."""
+        cfg["compression"] = dict(cfg["compression"], fixed_keep=0.5)
+        picks = {
+            tuple(sorted(u.text for u in compress(
+                [evidence_from_units(list(claim_evidence.units))],
+                cfg=cfg, mode="random", seed=s,
+            )[0].kept))
+            for s in range(12)
+        }
+        assert len(picks) > 1
+
+    def test_same_seed_is_reproducible(self, claim_evidence, cfg):
+        first = compress([claim_evidence], cfg=cfg, mode="random", seed=7)[0]
+        second = compress([claim_evidence], cfg=cfg, mode="random", seed=7)[0]
+        assert signature(first.kept) == signature(second.kept)

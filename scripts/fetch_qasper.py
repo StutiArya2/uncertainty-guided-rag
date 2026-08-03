@@ -104,6 +104,25 @@ def gold_answer(answer: dict) -> str | None:
     return "; ".join(cleaned) if cleaned else None
 
 
+def gold_evidence(annotations: list[dict]) -> list[str]:
+    """The passages annotators marked as supporting the answer, deduplicated.
+
+    Kept *unmodified* — unlike answer text, which has citation markers stripped. The
+    document retains its markers, so an evidence string stripped of them would no longer
+    match the text it came from. `src/gold_evidence.py` masks markers on both sides when
+    it needs to, which is the only way the two stay comparable.
+
+    This is what makes it possible to ask whether compression removed the evidence the
+    answer needed, rather than only whether the final answer happened to be right.
+    """
+    out: list[str] = []
+    for annotation in annotations:
+        for passage in annotation.get("highlighted_evidence") or []:
+            if passage and passage.strip() and passage not in out:
+                out.append(passage)
+    return out
+
+
 def collect(rows: list[dict], seen: set[str]) -> tuple[list[dict], list[dict]]:
     """Turn raw records into KB documents and eval questions."""
     documents, questions = [], []
@@ -143,6 +162,7 @@ def collect(rows: list[dict], seen: set[str]) -> tuple[list[dict], list[dict]]:
                         "paper": doc_id,
                         "answerable": True,
                         "gold": answerable[:3],
+                        "evidence": gold_evidence(annotations),
                     }
                 )
 
@@ -199,13 +219,44 @@ def main(argv: list[str] | None = None) -> int:
             lines.extend(f"    - {json.dumps(g)}" for g in q["gold"])
         else:
             lines.append("  gold: []")
+        if q.get("evidence"):
+            lines.append("  evidence:")
+            lines.extend(f"    - {json.dumps(e)}" for e in q["evidence"])
     QUESTIONS.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     answerable = sum(1 for q in questions if q["answerable"])
+    with_evidence = sum(1 for q in questions if q.get("evidence"))
     print(f"\n{len(documents)} papers -> {KB_DIR}")
     print(f"{len(questions)} questions -> {QUESTIONS}")
     print(f"  answerable:   {answerable}")
     print(f"  unanswerable: {len(questions) - answerable}  (real labels for the abstain path)")
+    print(f"  with marked evidence: {with_evidence}")
+
+    # Alignment is checked here rather than at eval time so a corpus that cannot support
+    # evidence-level metrics is visible when it is built, not when a result looks wrong.
+    from src.gold_evidence import align
+
+    by_id = {d["doc_id"]: d["text"] for d in documents}
+    totals = {"evidence": 0, "aligned": 0, "table_or_figure": 0, "unmatched": 0}
+    for q in questions:
+        if not q.get("evidence"):
+            continue
+        result = align(q["evidence"], by_id.get(q["paper"], ""))
+        totals["evidence"] += result.n_evidence
+        totals["aligned"] += result.n_aligned
+        totals["table_or_figure"] += result.n_table_or_figure
+        totals["unmatched"] += result.n_unmatched
+
+    if totals["evidence"]:
+        n = totals["evidence"]
+        print(f"\nevidence alignment over {n} marked passages:")
+        print(f"  aligned to spans: {totals['aligned']} ({totals['aligned'] / n:.1%})")
+        print(
+            f"  table or figure:  {totals['table_or_figure']} "
+            f"({totals['table_or_figure'] / n:.1%})  <- absent from a text-only corpus, "
+            "not a compression failure"
+        )
+        print(f"  unmatched:        {totals['unmatched']} ({totals['unmatched'] / n:.1%})")
     return 0
 
 
