@@ -98,14 +98,24 @@ class Pipeline:
             "Evidence was retrieved but did not support the question."
         )
 
-    def run(self, query: str, compression_mode: str | None = None) -> tuple[Answer, PipelineTrace]:
-        """Run one query end to end, returning the answer and its trace."""
+    def run(
+        self,
+        query: str,
+        compression_mode: str | None = None,
+        restrict_to: str | None = None,
+    ) -> tuple[Answer, PipelineTrace]:
+        """Run one query end to end, returning the answer and its trace.
+
+        `restrict_to` confines retrieval to a single document, for single-paper
+        benchmarks where the question is only meaningful relative to a given paper.
+        """
         trace = PipelineTrace(query=query, token_counts_exact=self.counter.is_exact)
 
         # Stages 1-3: claims, retrieval, claim-wise evidence.
         claims = decompose(query, cfg=self.cfg)
         evidence = map_evidence(
-            claims, self.retriever, cfg=self.cfg, counter=self.counter
+            claims, self.retriever, cfg=self.cfg, counter=self.counter,
+            restrict_to=restrict_to,
         )
 
         # Stage 4: compression (uncertainty is estimated and stored inside).

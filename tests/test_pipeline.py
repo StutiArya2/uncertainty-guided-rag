@@ -19,7 +19,7 @@ class StubRetriever:
         self.score_fn = score_fn or (lambda i: 0.9 - 0.1 * i)
         self.returned: list[EvidenceUnit] = []
 
-    def retrieve(self, query, top_k=None):
+    def retrieve(self, query, top_k=None, restrict_to=None):
         k = top_k or 6
         out = [
             EvidenceUnit(span=u.span, text=u.text, retrieval_score=self.score_fn(i))

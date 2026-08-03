@@ -172,6 +172,74 @@ class TestIdentityMode:
         assert signature(restore(compressed).units) == signature(claim_evidence.units)
 
 
+class TestAblationArms:
+    """The arms that make the central claim falsifiable.
+
+    Both keep a constant fraction regardless of uncertainty. If they matched the
+    uncertainty arm at equal budget, the proposal would add nothing.
+    """
+
+    def test_fixed_ratio_ignores_uncertainty(self, claim_evidence, cfg):
+        from src.compression import _fixed_ratio
+
+        counts = []
+        for uncertainty in (0.0, 0.5, 1.0):
+            item = evidence_from_units(list(claim_evidence.units))
+            item.uncertainty = uncertainty
+            counts.append(len(_fixed_ratio(item, cfg).kept))
+        assert len(set(counts)) == 1, f"fixed arm varied with uncertainty: {counts}"
+
+    def test_fixed_ratio_keeps_highest_scoring(self, claim_evidence, cfg):
+        compressed = compress([claim_evidence], cfg=cfg, mode="fixed_ratio")[0]
+        if compressed.dropped:
+            assert min(u.retrieval_score for u in compressed.kept) >= max(
+                u.retrieval_score for u in compressed.dropped
+            )
+
+    def test_random_arm_is_reproducible(self, claim_evidence, cfg):
+        """A seeded arm, or the ablation could not be rerun."""
+        first = compress([claim_evidence], cfg=cfg, mode="random")[0]
+        second = compress([claim_evidence], cfg=cfg, mode="random")[0]
+        assert [u.text for u in first.kept] == [u.text for u in second.kept]
+
+    def test_random_arm_ignores_score_order(self, cfg):
+        """It must actually be random, or it is just a second fixed_ratio arm."""
+        from src.types import EvidenceUnit, Span
+
+        units = [
+            EvidenceUnit(span=Span("d", i, i + 1), text=f"unit {i}", token_count=1)
+            for i in range(40)
+        ]
+        for i, u in enumerate(units):
+            u.retrieval_score = 1.0 - i * 0.01
+        item = ClaimEvidence(claim="c", units=units, token_count=len(units))
+
+        compressed = compress([item], cfg=cfg, mode="random")[0]
+        ranked_top = {u.text for u in sorted(units, key=lambda x: -x.retrieval_score)[
+            : len(compressed.kept)
+        ]}
+        assert {u.text for u in compressed.kept} != ranked_top
+
+    @pytest.mark.parametrize("mode", ["fixed_ratio", "random"])
+    def test_ablation_arms_are_reversible(self, claim_evidence, corpus, cfg, mode):
+        """Reversibility is a property of the design, not of one mode."""
+        original = signature(claim_evidence.units)
+        compressed = compress([claim_evidence], cfg=cfg, mode=mode)[0]
+        assert signature(restore(compressed).units) == original
+        assert signature(restore_from_corpus(compressed, corpus).units) == original
+
+    @pytest.mark.parametrize("mode", ["fixed_ratio", "random"])
+    def test_ablation_arms_conserve_units(self, claim_evidence, cfg, mode):
+        compressed = compress([claim_evidence], cfg=cfg, mode=mode)[0]
+        assert len(compressed.kept) + len(compressed.dropped) == len(
+            claim_evidence.units
+        )
+
+    def test_unknown_mode_raises(self, claim_evidence, cfg):
+        with pytest.raises(ValueError, match="unknown compression mode"):
+            compress([claim_evidence], cfg=cfg, mode="nonsense")
+
+
 class TestClaimEvidenceView:
     def test_view_exposes_only_kept_units(self, claim_evidence, cfg):
         compressed = compress([claim_evidence], cfg=cfg)[0]

@@ -47,8 +47,22 @@ measurements are recorded in the relevant module docstring.
   the KB plainly answers them ("dense retrieval differ from lexical retrieval" → 0.009).
   If claim decomposition ever switches to draft-answer decomposition, switch
   `evaluation.scorer` to `nli` — those claims *are* assertions.
-- **Evidence is title-prefixed before scoring.** Chunks are anaphoric; without the document
-  title the scorer cannot resolve the subject (0.004 → 0.997 on the same chunk).
+- **Evidence is title-prefixed before scoring — but only on some corpora.** Chunks are
+  anaphoric, and on the hand-built KB the title resolves the subject (0.004 → 0.997 on the
+  same chunk). On QASPER's real papers the effect **reverses** (0.176 → 0.004), because a
+  60-character paper-title slug repeated on every chunk disambiguates nothing and drowns
+  short passages. Set `evaluation.contextualize` per corpus; never carry it over.
+- **Score thresholds are corpus-specific, full stop.** Two have now been measured not to
+  transfer (title prefixing above, and the support threshold below). Assume none do.
+  `evaluation.scorers.relevance.threshold: 0.15` is right for the hand-built KB and
+  abstains on ~50% of *answerable* QASPER questions, whose median best-support is 0.080.
+  Calibrate with `scripts/calibrate_threshold.py` and pass `--support-threshold`; the
+  measurement belongs in the config comment next to the value.
+- **Answer length is scored, so it is configuration, not presentation.** `generation.style`
+  picks between `prose` (web UI) and `extractive` (benchmarks). Answer-F1 charges a
+  precision penalty per extra word, so the style has to match what the eval set expects.
+  `run_eval.py` reports a `length-implied ceiling` beside F1 for exactly this reason — a
+  low F1 is unreadable without it, since a wrong answer and a verbose one look identical.
 - **Units are scored individually, aggregated with max.** Concatenating a claim's evidence
   dilutes the signal (0.997 → 0.510).
 - **`identity` compression mode is not dead code.** It is the no-compression baseline arm
@@ -66,7 +80,7 @@ measurements are recorded in the relevant module docstring.
 ## Testing
 
 ```bash
-pytest tests/ -v                     # 106 tests
+pytest tests/ -v                     # 174 tests
 pytest tests/ -m "not integration"   # skip tests needing model weights
 ```
 
@@ -96,3 +110,8 @@ only legitimate if it can be undone exactly. If it fails, nothing downstream is 
   restoration path
 - When changing a threshold or model, re-run `scripts/run_eval.py` and update the results
   table in `README.md`. Numbers in docstrings are measurements, not decoration
+- **Treat identical results across arms as a bug, not a null result.** A run where
+  `identity`, `uncertainty_guided`, `fixed_ratio` and `random` all scored exactly 0.0332
+  was read as "compression makes no difference"; the real cause was that 80% of questions
+  abstained, and every arm emits the same refusal text. Check the arms actually diverge
+  before reading a verdict off them

@@ -1,0 +1,46 @@
+The following generation flags are not valid and may be ignored: ['top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+Knowledge base: data/qasper/kb
+Title prefixing: off
+Support threshold: 0.01 (overridden)
+Loaded 287 questions. Building index...
+Generation model: Qwen/Qwen2.5-0.5B-Instruct
+Answer style: extractive
+Running arm: identity ...
+Running arm: uncertainty_guided ...
+Running arm: fixed_ratio (keep=0.648, budget-matched) ...
+Running arm: random (keep=0.648, budget-matched) ...
+
+==========================================================================
+UNCERTAINTY-GUIDED COMPRESSION — BASELINE COMPARISON
+==========================================================================
+
+Reversibility on real retrieved evidence: PASS  [287 claims checked]
+
+metric                                identity  uncertainty_guided         fixed_ratio              random
+----------------------------------------------------------------------------------------------------------
+questions                                  287                 287                 287                 287
+baseline tokens                          69127               69127               69127               69127
+tokens sent to model                     69127               47823               48223               50749
+token reduction                           0.0%               30.8%               30.2%               26.6%
+restoration rate                          0.0%               24.4%               25.4%               26.8%
+answer F1 (vs gold)                      17.7%               16.2%               16.5%               16.7%
+  length-implied ceiling                 69.8%               69.9%               70.6%               70.6%
+  F1 as % of ceiling                     25.4%               23.2%               23.3%               23.7%
+  answer words (mean)                      8.2                 8.9                 8.5                 8.7
+  gold words (mean)                        9.0                 9.0                 9.0                 9.0
+false abstain (answerable)               22.5%               22.5%               22.5%               22.5%
+correct abstain (unansw.)                 9.1%                9.1%                9.1%                9.1%
+elapsed (s)                              111.8               113.0                87.8                95.5
+
+----------------------------------------------------------------------------------------------------------
+COST: 21304 tokens saved (30.8% reduction), keyword recall +0.0% vs baseline.
+----------------------------------------------------------------------------------------------------------
+ABLATION — does uncertainty guidance do the work?
+  budgets match: uncertainty 47823 tokens vs fixed 48223
+  answer F1: uncertainty 0.0030 worse (0.1618 vs 0.1648, paired n=276, p=0.6003)
+  false abstain: uncertainty 0.0% the same
+  VERDICT: INCONCLUSIVE. The difference is not distinguishable from
+           noise (p=0.6003, answer F1, n=276). Neither arm is shown
+           better. Either the effect is absent or the set is too small.
+
+wrote /private/tmp/claude-501/-Users-jayeshpani-Data-Compression/9c06b395-5aaa-4bd0-86a6-28621b89ef61/scratchpad/ablation_full.json
