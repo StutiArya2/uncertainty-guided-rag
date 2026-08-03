@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import random
 import re
 import sys
 import time
@@ -52,6 +53,8 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from src.compression import compress  # noqa: E402
 from src.config import load_config  # noqa: E402
+from src.provenance import collect as collect_provenance, dataset_record  # noqa: E402
+from src.gold_evidence import align as align_evidence, recall as evidence_recall  # noqa: E402
 from src.evidence_mapping import map_evidence  # noqa: E402
 from src.claims import decompose  # noqa: E402
 from src.pipeline import Pipeline  # noqa: E402
@@ -62,6 +65,19 @@ DEFAULT_QUESTIONS = REPO_ROOT / "data" / "eval" / "questions.yaml"
 # Order matters: uncertainty_guided runs before the ablation arms so its realised budget
 # can be measured and handed to them.
 MODES = ["identity", "uncertainty_guided", "fixed_ratio", "random"]
+
+# Available but not run by default. `oracle` reads the answer key and is a headroom
+# measurement rather than a system; `fixed_tokens` needs a token budget set explicitly.
+# Keeping them out of the default keeps the headline ablation to arms that are all
+# deployable and all budget-matched.
+EXTRA_MODES = ["fixed_tokens", "oracle"]
+ALL_MODES = MODES + EXTRA_MODES
+
+# Below this, a narrow confidence interval is not trustworthy enough to declare a bounded
+# null. The interval is built from a variance *estimated from the same small sample*, and
+# on a lucky draw that estimate is too small, producing a confident "no effect" from data
+# that cannot support one. A smoke test must not be able to close a research question.
+MIN_N_FOR_NULL = 100
 
 
 def apply_override(cfg, assignment: str) -> None:
@@ -88,6 +104,73 @@ def apply_override(cfg, assignment: str) -> None:
     node[parts[-1]] = yaml.safe_load(raw)
 
 
+class _SpanView:
+    """Adapts a trace `EvidenceRecord` to the `.span` shape gold_evidence expects.
+
+    The trace records offsets because the GUI needs them; gold_evidence works in spans.
+    Rather than widen either interface for the sake of one caller, they meet here.
+    """
+
+    __slots__ = ("span",)
+
+    class _Span:
+        __slots__ = ("doc_id", "start", "end")
+
+        def __init__(self, doc_id, start, end):
+            self.doc_id, self.start, self.end = doc_id, start, end
+
+    def __init__(self, record):
+        self.span = self._Span(record.doc_id, record.start, record.end)
+
+
+def evidence_outcome(trace, gold_spans, doc_id) -> dict | None:
+    """Did compression drop evidence the answer needed, and did restoration notice?
+
+    Blame is scoped deliberately. Recall is measured against what **retrieval actually
+    returned**, not against all marked evidence: if retrieval never surfaced the passage,
+    losing it is a retrieval failure and charging it to the compressor would make a good
+    compressor look bad on a corpus with weak retrieval.
+
+    So the comparison is `kept` against `kept + dropped`, and the interesting cell is:
+
+        evidence was retrieved, compression dropped it, restoration did NOT fire
+
+    which is the only case where the safety net was needed and missed. That is the number
+    the reversibility claim lives or dies on.
+    """
+    if not gold_spans:
+        return None
+
+    kept = [_SpanView(r) for c in trace.claims for r in c.kept]
+    dropped = [_SpanView(r) for c in trace.claims for r in c.dropped]
+
+    retrieved_recall = evidence_recall(gold_spans, kept + dropped, doc_id)
+    if retrieved_recall == 0.0:
+        # Retrieval never found the marked evidence. Nothing to say about compression.
+        return {"retrieval_found": False}
+
+    kept_recall = evidence_recall(gold_spans, kept, doc_id)
+    # Tolerance guards against a character or two lost to chunk-boundary rounding being
+    # reported as a dropped passage.
+    lost = kept_recall < retrieved_recall - 1e-9
+    # Reported separately because "any loss" is a strict test: QASPER marks whole
+    # paragraphs and we chunk by sentence, so trimming one sentence of a marked paragraph
+    # counts as a loss even though the answer may survive in a neighbouring chunk.
+    # Complete loss admits no such objection — every retrieved trace of the supporting
+    # passage is gone.
+    lost_completely = lost and kept_recall == 0.0
+
+    return {
+        "retrieval_found": True,
+        "retrieval_recall": retrieved_recall,
+        "kept_recall": kept_recall,
+        "evidence_dropped": lost,
+        "evidence_lost_completely": lost_completely,
+        "restoration_fired": trace.restoration_triggered,
+        "dangerous": lost and not trace.restoration_triggered,
+    }
+
+
 class NullGenerator:
     """Stands in for the generator when --no-generate is used."""
 
@@ -100,6 +183,9 @@ class ArmResult:
     mode: str
     baseline_tokens: int = 0
     final_tokens: int = 0
+    # End-to-end prompt cost. `*_tokens` above count evidence text only.
+    prompt_tokens: int = 0
+    prompt_tokens_uncompressed: int = 0
     n_questions: int = 0
     n_answerable: int = 0
     restorations: int = 0
@@ -111,14 +197,39 @@ class ArmResult:
     ceilings: list[float] = field(default_factory=list)
     pred_words: list[int] = field(default_factory=list)
     gold_words: list[int] = field(default_factory=list)
+    # Evidence-level accounting. Populated only for questions whose marked evidence both
+    # aligned to spans and was actually retrieved — see evidence_outcome().
+    n_evidence_scored: int = 0
+    evidence_dropped: int = 0
+    evidence_dropped_restored: int = 0
+    evidence_dropped_missed: int = 0
+    evidence_lost_completely: int = 0
+    evidence_lost_completely_missed: int = 0
+    kept_recalls: list[float] = field(default_factory=list)
+    retrieval_recalls: list[float] = field(default_factory=list)
     elapsed: float = 0.0
     rows: list[dict] = field(default_factory=list)
+    # Populated when an arm is averaged over several seeds; records the spread so the
+    # report can show a distribution rather than implying a single draw is definitive.
+    seed_spread: dict | None = None
 
     @property
     def reduction(self) -> float:
         if self.baseline_tokens == 0:
             return 0.0
         return (self.baseline_tokens - self.final_tokens) / self.baseline_tokens
+
+    @property
+    def prompt_reduction(self) -> float:
+        """Reduction in tokens actually sent to the model, template and all.
+
+        Always lower than `reduction`, because the prompt scaffolding does not compress.
+        This is the number a cost claim has to be made on.
+        """
+        if not self.prompt_tokens_uncompressed:
+            return 0.0
+        saved = self.prompt_tokens_uncompressed - self.prompt_tokens
+        return saved / self.prompt_tokens_uncompressed
 
     @property
     def restoration_rate(self) -> float:
@@ -156,6 +267,59 @@ class ArmResult:
         return self.mean_f1 / self.mean_ceiling if self.mean_ceiling else 0.0
 
     @property
+    def gold_evidence_recall(self) -> float:
+        """Marked evidence surviving compression, before restoration."""
+        return (
+            sum(self.kept_recalls) / len(self.kept_recalls) if self.kept_recalls else 0.0
+        )
+
+    @property
+    def retrieval_evidence_recall(self) -> float:
+        """The ceiling retrieval achieved — compression cannot beat this."""
+        return (
+            sum(self.retrieval_recalls) / len(self.retrieval_recalls)
+            if self.retrieval_recalls
+            else 0.0
+        )
+
+    @property
+    def restoration_detector_recall(self) -> float:
+        """P(restoration fired | compression dropped needed evidence). Higher is better."""
+        return (
+            self.evidence_dropped_restored / self.evidence_dropped
+            if self.evidence_dropped
+            else 0.0
+        )
+
+    @property
+    def dangerous_false_negative_rate(self) -> float:
+        """P(restoration did NOT fire | compression dropped needed evidence).
+
+        The safety-critical number. Every one of these is a question answered from
+        evidence known to be missing the passage that supported the reference answer,
+        with the mechanism designed to catch exactly that staying silent.
+        """
+        return (
+            self.evidence_dropped_missed / self.evidence_dropped
+            if self.evidence_dropped
+            else 0.0
+        )
+
+    @property
+    def total_loss_missed_rate(self) -> float:
+        """Dangerous rate restricted to *complete* loss of the retrieved evidence.
+
+        The claim-proof version of `dangerous_false_negative_rate`: no argument about
+        chunk boundaries or partial paragraphs survives here, because nothing of the
+        supporting passage remained.
+        """
+        return (
+            self.evidence_lost_completely_missed / self.evidence_lost_completely
+            if self.evidence_lost_completely
+            else 0.0
+        )
+
+    @property
     def mean_pred_words(self) -> float:
         return sum(self.pred_words) / len(self.pred_words) if self.pred_words else 0.0
 
@@ -170,6 +334,9 @@ class ArmResult:
             "baseline_tokens": self.baseline_tokens,
             "final_tokens": self.final_tokens,
             "reduction": round(self.reduction, 4),
+            "prompt_tokens": self.prompt_tokens,
+            "prompt_tokens_uncompressed": self.prompt_tokens_uncompressed,
+            "prompt_reduction": round(self.prompt_reduction, 4),
             "restoration_rate": round(self.restoration_rate, 4),
             "false_abstain_rate": round(self.false_abstain_rate, 4),
             "correct_abstain_rate": round(self.correct_abstain_rate, 4),
@@ -179,7 +346,23 @@ class ArmResult:
             "f1_vs_ceiling": round(self.f1_vs_ceiling, 4),
             "mean_answer_words": round(self.mean_pred_words, 1),
             "mean_gold_words": round(self.mean_gold_words, 1),
+            "evidence": {
+                "n_scored": self.n_evidence_scored,
+                "retrieval_recall": round(self.retrieval_evidence_recall, 4),
+                "kept_recall": round(self.gold_evidence_recall, 4),
+                "dropped": self.evidence_dropped,
+                "dropped_and_restored": self.evidence_dropped_restored,
+                "dropped_and_missed": self.evidence_dropped_missed,
+                "detector_recall": round(self.restoration_detector_recall, 4),
+                "dangerous_false_negative_rate": round(
+                    self.dangerous_false_negative_rate, 4
+                ),
+                "lost_completely": self.evidence_lost_completely,
+                "lost_completely_missed": self.evidence_lost_completely_missed,
+                "total_loss_missed_rate": round(self.total_loss_missed_rate, 4),
+            },
             "elapsed_seconds": round(self.elapsed, 1),
+            "seed_spread": self.seed_spread,
             "rows": self.rows,
         }
 
@@ -324,6 +507,96 @@ def paired_interval(a: list[float], b: list[float]) -> tuple[float, float, float
     return mean, p, mean - 1.96 * se, mean + 1.96 * se
 
 
+def cluster_bootstrap(
+    a: list[float],
+    b: list[float],
+    clusters: list[str],
+    n_boot: int = 10000,
+    seed: int = 20260803,
+) -> tuple[float, float, float]:
+    """Paired difference with a CI that resamples **papers**, not questions.
+
+    QASPER asks several questions about each paper, and they are not independent: they
+    share a document, a vocabulary, and whatever the retriever does well or badly on that
+    document. Treating 276 questions as 276 independent observations counts information
+    that is not there and reports an interval narrower than the data supports.
+
+    Resampling whole papers respects that structure. The interval widens, which is the
+    honest direction — an effect that survives this is one a reviewer cannot dismiss as
+    pseudo-replication, and an effect that does not survive it was never real.
+
+    Returns (mean difference, 2.5th percentile, 97.5th percentile).
+    """
+    if len(a) != len(b) or len(a) != len(clusters) or len(a) < 2:
+        return 0.0, 0.0, 0.0
+
+    by_cluster: dict[str, list[float]] = {}
+    for x, y, cluster in zip(a, b, clusters):
+        by_cluster.setdefault(cluster, []).append(x - y)
+
+    names = sorted(by_cluster)
+    if len(names) < 2:
+        return 0.0, 0.0, 0.0
+
+    observed = [d for name in names for d in by_cluster[name]]
+    mean = sum(observed) / len(observed)
+
+    rng = random.Random(seed)
+    means: list[float] = []
+    for _ in range(n_boot):
+        pooled: list[float] = []
+        for _ in names:
+            pooled.extend(by_cluster[names[rng.randrange(len(names))]])
+        if pooled:
+            means.append(sum(pooled) / len(pooled))
+
+    means.sort()
+    lo = means[int(0.025 * len(means))]
+    hi = means[min(int(0.975 * len(means)), len(means) - 1)]
+    return mean, lo, hi
+
+
+def cluster_permutation_p(
+    a: list[float],
+    b: list[float],
+    clusters: list[str],
+    n_perm: int = 10000,
+    seed: int = 20260803,
+) -> float:
+    """Sign-flip permutation test at the paper level.
+
+    Under the null the two arms are interchangeable, so flipping which arm is which is
+    valid — but the flip must apply to a whole paper at once, for the same reason the
+    bootstrap resamples papers. Flipping individual questions would assume the very
+    independence the clustering denies.
+    """
+    if len(a) != len(b) or len(a) != len(clusters) or len(a) < 2:
+        return 1.0
+
+    by_cluster: dict[str, list[float]] = {}
+    for x, y, cluster in zip(a, b, clusters):
+        by_cluster.setdefault(cluster, []).append(x - y)
+
+    names = sorted(by_cluster)
+    total = sum(sum(by_cluster[n]) for n in names)
+    count = sum(len(by_cluster[n]) for n in names)
+    if count == 0:
+        return 1.0
+    observed = abs(total / count)
+
+    rng = random.Random(seed)
+    at_least_as_extreme = 0
+    for _ in range(n_perm):
+        flipped = sum(
+            (1 if rng.random() < 0.5 else -1) * sum(by_cluster[n]) for n in names
+        )
+        if abs(flipped / count) >= observed - 1e-15:
+            at_least_as_extreme += 1
+    # +1 in both terms: a permutation test can never report p = 0, since the observed
+    # arrangement is itself one of the possibilities being counted.
+    return (at_least_as_extreme + 1) / (n_perm + 1)
+
+
 def realised_keep_fraction(result: ArmResult) -> float:
     """Fraction of candidate units the arm actually kept.
 
@@ -337,11 +610,111 @@ def realised_keep_fraction(result: ArmResult) -> float:
     return kept / total if total else 1.0
 
 
-def run_arm(pipeline: Pipeline, questions: list[dict], mode: str) -> ArmResult:
+def align_all(questions: list[dict], corpus) -> tuple[dict[int, list], dict]:
+    """Align every question's marked evidence once, before any arm runs.
+
+    Done up front rather than per arm because alignment is arm-independent and would
+    otherwise be recomputed four times over identical inputs. Returns the spans keyed by
+    question index, plus the alignment statistics — which are reported rather than hidden,
+    since a metric computed over 84% of the evidence must say that it is.
+    """
+    spans: dict[int, list] = {}
+    stats = {"evidence": 0, "aligned": 0, "table_or_figure": 0, "unmatched": 0,
+             "questions_with_evidence": 0, "questions_usable": 0}
+
+    for i, item in enumerate(questions):
+        marked = item.get("evidence") or []
+        if not marked:
+            continue
+        stats["questions_with_evidence"] += 1
+        document = corpus.get(item.get("paper", ""))
+        if document is None:
+            continue
+        result = align_evidence(marked, document.text)
+        stats["evidence"] += result.n_evidence
+        stats["aligned"] += result.n_aligned
+        stats["table_or_figure"] += result.n_table_or_figure
+        stats["unmatched"] += result.n_unmatched
+        if result.usable:
+            stats["questions_usable"] += 1
+            spans[i] = result.spans
+    return spans, stats
+
+
+def summarise_seeds(draws: list[ArmResult]) -> ArmResult:
+    """Collapse several random draws into one arm, averaging per question.
+
+    Averaging *per question* rather than across whole-arm totals keeps the result paired
+    with the other arms: the significance tests compare question i against question i, and
+    they would be meaningless against a mean taken over a different set of questions.
+
+    The spread across seeds is kept in `seed_spread` so the report can show that random
+    selection is being represented by a distribution and not by one lucky or unlucky draw.
+    """
+    if len(draws) == 1:
+        return draws[0]
+
+    base = draws[0]
+    merged = ArmResult(mode=base.mode)
+    n = len(draws)
+
+    merged.n_questions = base.n_questions
+    merged.n_answerable = base.n_answerable
+    merged.baseline_tokens = round(sum(d.baseline_tokens for d in draws) / n)
+    merged.final_tokens = round(sum(d.final_tokens for d in draws) / n)
+    merged.prompt_tokens = round(sum(d.prompt_tokens for d in draws) / n)
+    merged.prompt_tokens_uncompressed = round(
+        sum(d.prompt_tokens_uncompressed for d in draws) / n
+    )
+    merged.restorations = round(sum(d.restorations for d in draws) / n)
+    merged.abstained_answerable = round(sum(d.abstained_answerable for d in draws) / n)
+    merged.abstained_unanswerable = round(
+        sum(d.abstained_unanswerable for d in draws) / n
+    )
+    merged.keyword_hits = round(sum(d.keyword_hits for d in draws) / n)
+    merged.keyword_total = base.keyword_total
+    merged.elapsed = sum(d.elapsed for d in draws)
+
+    for attribute in ("f1_scores", "ceilings", "kept_recalls", "retrieval_recalls"):
+        columns = [getattr(d, attribute) for d in draws]
+        if columns and all(len(c) == len(columns[0]) for c in columns):
+            setattr(
+                merged,
+                attribute,
+                [sum(values) / n for values in zip(*columns)],
+            )
+
+    merged.pred_words = base.pred_words
+    merged.gold_words = base.gold_words
+    for attribute in (
+        "n_evidence_scored", "evidence_dropped", "evidence_dropped_restored",
+        "evidence_dropped_missed", "evidence_lost_completely",
+        "evidence_lost_completely_missed",
+    ):
+        setattr(merged, attribute, round(sum(getattr(d, attribute) for d in draws) / n))
+
+    merged.rows = base.rows
+    merged.seed_spread = {
+        "n_seeds": n,
+        "reduction": [round(d.reduction, 4) for d in draws],
+        "mean_f1": [round(d.mean_f1, 4) for d in draws],
+        "restoration_rate": [round(d.restoration_rate, 4) for d in draws],
+    }
+    return merged
+
+
+def run_arm(
+    pipeline: Pipeline,
+    questions: list[dict],
+    mode: str,
+    gold_spans: dict[int, list] | None = None,
+    seed: int | None = None,
+) -> ArmResult:
     result = ArmResult(mode=mode)
+    gold_spans = gold_spans or {}
     start = time.time()
 
-    for item in questions:
+    for index, item in enumerate(questions):
         query = item["query"]
         answerable = item.get("answerable", True)
         expected = [k.lower() for k in item.get("expect", [])]
@@ -349,13 +722,29 @@ def run_arm(pipeline: Pipeline, questions: list[dict], mode: str) -> ArmResult:
         # `expect` keywords. Supporting both keeps the original result reproducible.
         golds = [g for g in item.get("gold", []) if g]
 
+        spans = gold_spans.get(index)
         answer, trace = pipeline.run(
-            query, compression_mode=mode, restrict_to=item.get('paper')
+            query,
+            compression_mode=mode,
+            restrict_to=item.get("paper"),
+            seed=seed,
+            # Only the oracle arm ever receives the answer key, and `compress()` rejects
+            # it for every other mode. Passed even when empty — a question whose evidence
+            # is unaligned or absent leaves the oracle nothing to select on, where it
+            # falls back to top-1 like any other arm's floor. Those questions are excluded
+            # from the evidence metrics anyway, so the ceiling is not measured from them.
+            oracle_spans=(
+                {(item.get("paper", ""), s.start, s.end) for s in (spans or [])}
+                if mode == "oracle"
+                else None
+            ),
         )
 
         result.n_questions += 1
         result.baseline_tokens += trace.baseline_tokens
         result.final_tokens += trace.final_tokens
+        result.prompt_tokens += trace.prompt_tokens
+        result.prompt_tokens_uncompressed += trace.prompt_tokens_uncompressed
         if trace.restoration_triggered:
             result.restorations += 1
 
@@ -392,9 +781,26 @@ def run_arm(pipeline: Pipeline, questions: list[dict], mode: str) -> ArmResult:
         elif answer.abstained:
             result.abstained_unanswerable += 1
 
+        outcome = evidence_outcome(trace, gold_spans.get(index), item.get("paper", ""))
+        if outcome and outcome.get("retrieval_found"):
+            result.n_evidence_scored += 1
+            result.kept_recalls.append(outcome["kept_recall"])
+            result.retrieval_recalls.append(outcome["retrieval_recall"])
+            if outcome["evidence_dropped"]:
+                result.evidence_dropped += 1
+                if outcome["restoration_fired"]:
+                    result.evidence_dropped_restored += 1
+                else:
+                    result.evidence_dropped_missed += 1
+            if outcome["evidence_lost_completely"]:
+                result.evidence_lost_completely += 1
+                if not outcome["restoration_fired"]:
+                    result.evidence_lost_completely_missed += 1
+
         result.rows.append(
             {
                 "query": query,
+                "evidence_outcome": outcome,
                 # Recorded so the dev/test split used by calibrate_threshold.py can be
                 # reapplied to these rows afterwards. The support threshold is picked on
                 # dev, and while it is shared identically by all four arms and so cannot
@@ -453,9 +859,14 @@ def print_report(
         print(f"{label:<26}" + "".join(f"{fmt.format(fn(a)):>{width}}" for a in arms))
 
     row("questions", lambda a: a.n_questions, "{:d}")
-    row("baseline tokens", lambda a: a.baseline_tokens, "{:d}")
-    row("tokens sent to model", lambda a: a.final_tokens, "{:d}")
-    row("token reduction", lambda a: a.reduction)
+    row("evidence tokens (baseline)", lambda a: a.baseline_tokens, "{:d}")
+    row("evidence tokens (sent)", lambda a: a.final_tokens, "{:d}")
+    row("evidence reduction", lambda a: a.reduction)
+    if any(a.prompt_tokens_uncompressed for a in arms):
+        # The number a cost claim rests on. Lower than the evidence reduction, because
+        # the preamble, labels, question and chat template do not compress.
+        row("PROMPT tokens (sent)", lambda a: a.prompt_tokens, "{:d}")
+        row("PROMPT reduction", lambda a: a.prompt_reduction)
     row("restoration rate", lambda a: a.restoration_rate)
     if generated and any(a.f1_scores for a in arms):
         row("answer F1 (vs gold)", lambda a: a.mean_f1)
@@ -472,6 +883,17 @@ def print_report(
         # Without generation there is no answer text to search, so a 0% here would read
         # as a quality failure rather than "not measured".
         print(f"{'keyword recall':<26}" + "".join(f"{'n/a (--no-generate)':>23}" for _ in arms))
+    if any(a.n_evidence_scored for a in arms):
+        print(line)
+        row("gold evidence retrieved", lambda a: a.retrieval_evidence_recall)
+        row("  ...surviving compression", lambda a: a.gold_evidence_recall)
+        row("needed evidence dropped", lambda a: a.evidence_dropped, "{:d}")
+        row("  restoration caught it", lambda a: a.restoration_detector_recall)
+        row("  DANGEROUS: missed", lambda a: a.dangerous_false_negative_rate)
+        row("evidence lost ENTIRELY", lambda a: a.evidence_lost_completely, "{:d}")
+        row("  ...and missed", lambda a: a.total_loss_missed_rate)
+        print(line)
+
     row("false abstain (answerable)", lambda a: a.false_abstain_rate)
     row("correct abstain (unansw.)", lambda a: a.correct_abstain_rate)
     row("elapsed (s)", lambda a: a.elapsed, "{:.1f}")
@@ -535,7 +957,26 @@ def print_report(
                 f"({compressed.mean_f1:.4f} vs {fixed.mean_f1:.4f}, "
                 f"paired n={n}, p={p:.4f})"
             )
-            print(f"  95% CI on the difference: [{lo:+.4f}, {hi:+.4f}]")
+            print(f"  95% CI, questions independent: [{lo:+.4f}, {hi:+.4f}]")
+
+            # The interval that actually governs the verdict. Questions cluster within
+            # papers, so this one is wider and is the one reported in the paper.
+            papers = [
+                r["paper"] for r in compressed.rows if r.get("f1") is not None
+            ]
+            if papers and len(papers) == len(compressed.f1_scores):
+                _, clo, chi = cluster_bootstrap(
+                    compressed.f1_scores, fixed.f1_scores, papers
+                )
+                cp = cluster_permutation_p(
+                    compressed.f1_scores, fixed.f1_scores, papers
+                )
+                n_papers = len(set(papers))
+                print(
+                    f"  95% CI, clustered by paper: [{clo:+.4f}, {chi:+.4f}]  "
+                    f"(p={cp:.4f}, {n_papers} papers)  <- primary"
+                )
+                lo, hi, p = clo, chi, cp
         elif generated:
             delta = compressed.keyword_recall - fixed.keyword_recall
             p = two_proportion_p(
@@ -555,7 +996,7 @@ def print_report(
 
         if not generated:
             print("  VERDICT: cannot judge without generation (--no-generate).")
-        elif p > 0.05 and lo > -min_effect and hi < min_effect:
+        elif p > 0.05 and lo > -min_effect and hi < min_effect and n >= MIN_N_FOR_NULL:
             # The interval rules out an effect worth having. This is a *result*, not a
             # failure to get one, and it must not be reported as "inconclusive" —
             # inconclusive invites collecting more data, and more data will not help.
@@ -566,6 +1007,13 @@ def print_report(
                 f"(n={n}).\n"
                 "           Uncertainty guidance does not beat a fixed budget at equal\n"
                 "           cost. Collecting more questions will not change this."
+            )
+        elif p > 0.05 and n < MIN_N_FOR_NULL:
+            print(
+                f"  VERDICT: INCONCLUSIVE — SAMPLE TOO SMALL TO CLOSE THE QUESTION.\n"
+                f"           p={p:.4f}, 95% CI [{lo:+.4f}, {hi:+.4f}], n={n}. The interval\n"
+                f"           may look tight, but below n={MIN_N_FOR_NULL} it rests on a\n"
+                "           variance estimated from the same few points. Run the full set."
             )
         elif p > 0.05:
             print(
@@ -594,7 +1042,18 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="skip answer generation; token and branch metrics only",
     )
-    parser.add_argument("--modes", nargs="+", choices=MODES, default=MODES)
+    parser.add_argument("--modes", nargs="+", choices=ALL_MODES, default=MODES)
+    parser.add_argument(
+        "--random-seeds",
+        type=int,
+        default=1,
+        help=(
+            "run the random arm this many times and report the distribution. One draw is "
+            "an anecdote: any claim of the form 'ranked selection beats random' is only "
+            "as strong as the spread of the arm it beats. 20 is a reasonable default for "
+            "a reported result"
+        ),
+    )
     parser.add_argument(
         "--generation-model",
         default=None,
@@ -694,8 +1153,20 @@ def main(argv: list[str] | None = None) -> int:
 
     round_trip = check_round_trip(pipeline, [q["query"] for q in questions], cfg)
 
+    gold_spans, alignment = align_all(questions, pipeline.retriever.corpus)
+    if alignment["evidence"]:
+        n = alignment["evidence"]
+        print(
+            f"Gold evidence: {alignment['aligned']}/{n} passages aligned "
+            f"({alignment['aligned'] / n:.1%}); "
+            f"{alignment['table_or_figure']} table/figure, "
+            f"{alignment['unmatched']} unmatched. "
+            f"{alignment['questions_usable']} questions scorable."
+        )
+
     arms = []
     calibrated: float | None = None
+    base_seed = int(cfg.get_path("compression.random_seed", 0))
     for mode in args.modes:
         # Calibrate the ablation arms to the budget uncertainty_guided actually spent,
         # so the comparison isolates allocation rather than amount.
@@ -705,7 +1176,27 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"Running arm: {mode} ...")
 
-        arm = run_arm(pipeline, questions, mode)
+        if mode == "random" and args.random_seeds > 1:
+            # One random draw is an anecdote. The claim "ranked selection beats random"
+            # is only as strong as the spread of the arm it beats, so run it many times
+            # and report the distribution.
+            draws = []
+            for i in range(args.random_seeds):
+                draws.append(
+                    run_arm(
+                        pipeline, questions, mode, gold_spans=gold_spans,
+                        seed=base_seed + i,
+                    )
+                )
+            arm = summarise_seeds(draws)
+            print(
+                f"  random over {len(draws)} seeds: reduction "
+                f"{min(d.reduction for d in draws):.1%}–"
+                f"{max(d.reduction for d in draws):.1%}, F1 "
+                f"{min(d.mean_f1 for d in draws):.4f}–{max(d.mean_f1 for d in draws):.4f}"
+            )
+        else:
+            arm = run_arm(pipeline, questions, mode, gold_spans=gold_spans)
         arms.append(arm)
 
         if mode == "uncertainty_guided":
@@ -721,12 +1212,20 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.json:
         payload = {
+            # Provenance first, so the file opens on what produced it rather than on
+            # 900 kB of per-question rows.
+            "provenance": collect_provenance(
+                cfg,
+                argv=["python", "scripts/run_eval.py"] + (argv or sys.argv[1:]),
+                extra={"dataset": dataset_record(args.questions, args.kb)},
+            ),
             "round_trip_checked": round_trip[0],
             "round_trip_failures": round_trip[1],
             "token_counts_exact": pipeline.counter.is_exact,
             "generation_skipped": args.no_generate,
             "arms": [a.to_dict() for a in arms],
         }
+        args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         print(f"wrote {args.json}")
 

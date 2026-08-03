@@ -118,6 +118,30 @@ evaluation:
       model: MoritzLaurer/DeBERTa-v3-large-mnli-fever-anli-ling-wanli
       threshold: 0.55
 
+restoration:
+  # WHICH SIGNAL DECIDES THAT COMPRESSION WENT TOO FAR.
+  #
+  # These are two different questions and they were conflated:
+  #   "does the corpus answer this at all?"        -> abstention
+  #   "did compression drop something needed?"     -> restoration
+  # One absolute threshold answered both, which meant the restoration trigger inherited a
+  # corpus-specific constant it has no reason to depend on.
+  #
+  #   absolute — restore when compressed support falls under the abstain threshold.
+  #              Measured on QASPER: when compression removed ALL trace of the human-marked
+  #              answer evidence, this fired on 0 of 6 cases. The signal is topical
+  #              relevance, and dropping the answer sentence usually leaves other on-topic
+  #              sentences scoring just as high, so the loss is invisible to it.
+  #   relative — restore when compressed support falls materially below what the FULL
+  #              evidence set scores for the same claim. Self-calibrating: it asks whether
+  #              compression *changed* anything, which needs no per-corpus threshold.
+  #
+  # Costs one extra scoring pass per claim. Reported as an ablation rather than swapped
+  # in silently, since `absolute` is what every result before 2026-08-03 used.
+  policy: absolute
+  # Restore when compressed support drops below this fraction of full-evidence support.
+  retain_fraction: 0.9
+
 abstain:
   # If every retrieved candidate for a claim scores below this, the KB likely lacks the
   # answer -> recommend retrieve-more rather than clarify.

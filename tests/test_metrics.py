@@ -113,6 +113,62 @@ class TestSignificanceGuards:
         assert run_eval.paired_p([0.5], [0.1]) == (0.0, 1.0)
 
 
+class TestClusteredInference:
+    """Questions from one paper are correlated. Treating them as independent counts
+    information that is not there and reports a narrower interval than the data supports."""
+
+    def test_clustered_interval_is_wider_than_the_naive_one(self):
+        """The whole reason for clustering: 40 questions across 4 papers carry far less
+        information than 40 independent questions, and the interval must show it."""
+        a, b, papers = [], [], []
+        for paper in range(4):
+            # A per-paper offset — exactly the correlation clustering exists to handle.
+            offset = 0.2 if paper % 2 else -0.2
+            for _ in range(10):
+                a.append(0.5 + offset)
+                b.append(0.5)
+                papers.append(f"paper_{paper}")
+
+        _, naive_lo, naive_hi = (
+            run_eval.paired_interval(a, b)[0],
+            run_eval.paired_interval(a, b)[2],
+            run_eval.paired_interval(a, b)[3],
+        )
+        _, clustered_lo, clustered_hi = run_eval.cluster_bootstrap(a, b, papers, n_boot=2000)
+        assert (clustered_hi - clustered_lo) > (naive_hi - naive_lo)
+
+    def test_bootstrap_brackets_the_observed_mean(self):
+        a = [0.5, 0.6, 0.4, 0.7, 0.55, 0.65]
+        b = [0.3, 0.4, 0.2, 0.5, 0.35, 0.45]
+        papers = ["p1", "p1", "p2", "p2", "p3", "p3"]
+        mean, lo, hi = run_eval.cluster_bootstrap(a, b, papers, n_boot=2000)
+        assert mean == pytest.approx(0.2)
+        assert lo <= mean <= hi
+
+    def test_bootstrap_is_deterministic(self):
+        a, b = [0.1, 0.9, 0.4, 0.6], [0.2, 0.3, 0.5, 0.1]
+        papers = ["p1", "p1", "p2", "p2"]
+        first = run_eval.cluster_bootstrap(a, b, papers, n_boot=500)
+        assert first == run_eval.cluster_bootstrap(a, b, papers, n_boot=500)
+
+    def test_permutation_p_is_high_when_arms_match(self):
+        a = [0.5, 0.6, 0.4, 0.7]
+        papers = ["p1", "p1", "p2", "p2"]
+        assert run_eval.cluster_permutation_p(a, list(a), papers, n_perm=500) > 0.05
+
+    def test_permutation_p_never_reports_zero(self):
+        """The observed arrangement is itself one of the possibilities being counted."""
+        a = [1.0] * 20
+        b = [0.0] * 20
+        papers = [f"p{i}" for i in range(20)]
+        assert run_eval.cluster_permutation_p(a, b, papers, n_perm=200) > 0
+
+    def test_single_cluster_yields_no_verdict(self):
+        """One paper cannot support inference about papers in general."""
+        a, b = [0.5, 0.6], [0.1, 0.2]
+        assert run_eval.cluster_bootstrap(a, b, ["p1", "p1"]) == (0.0, 0.0, 0.0)
+
+
 class TestConfigOverride:
     def test_sets_a_nested_value_with_the_right_type(self):
         from src.config import load_config
