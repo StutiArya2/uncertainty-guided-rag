@@ -46,6 +46,9 @@ class Generator:
         self.style = answer_style(self.cfg, style)
         self._model = None
         self._tokenizer = None
+        # Cost instrumentation — see SupportScorer for why this is tracked.
+        self.calls = 0
+        self.prompt_tokens_total = 0
 
     def _load(self):
         if self._model is None:
@@ -101,6 +104,8 @@ class Generator:
             messages, tokenize=False, add_generation_prompt=True
         )
         inputs = tokenizer(text, return_tensors="pt").to(self.device)
+        self.calls += 1
+        self.prompt_tokens_total += int(inputs["input_ids"].shape[1])
 
         with torch.no_grad():
             output = model.generate(
