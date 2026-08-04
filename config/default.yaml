@@ -15,6 +15,42 @@ models:
   # torch device: "auto" picks mps on arm64 Macs, else cuda, else cpu.
   device: auto
 
+server:
+  # SETTINGS FOR THE READING ROOM, WHICH SERVES REAL UPLOADED PAPERS.
+  #
+  # The defaults below this block were calibrated on the 24-document hand-built corpus and
+  # are wrong for real papers in two ways that were each measured and then, for three
+  # weeks, never applied to the actual product:
+  #
+  #   contextualize: prefixing evidence with the document title measured +0.99 on the
+  #     hand-built corpus and REVERSES on real papers (0.176 -> 0.004), because a paper's
+  #     title slug repeats on every chunk and disambiguates nothing. On a real uploaded
+  #     paper it drove support for a genuine question from 0.118 down to 0.024.
+  #   support threshold: 0.15 is above the median best-support of *answerable* questions
+  #     on real papers (0.080), so the interface refused to answer questions its own
+  #     retrieved evidence covered.
+  #
+  # Together these made the reading room abstain on questions it could answer. Overriding
+  # them here rather than changing the defaults keeps every archived experiment
+  # reproducible.
+  contextualize: false
+  support_threshold: 0.01
+  # WHICH SIGNAL DECIDES A REFUSAL. "retrieval" for real papers.
+  #
+  # The support scorer cannot carry this decision on real documents. Measured on an
+  # uploaded literature survey, the sentence containing the answer scored 0.00085 while
+  # still being the top-ranked unit — the ranking is informative, the absolute scale is
+  # not. Any fixed cut therefore refuses everything or nothing, and refusing a question
+  # whose answer sits at rank 1 is the worst thing this interface can do.
+  #
+  # Cosine similarity is bounded, calibrated and comparable across corpora, so
+  # "nothing retrieved is even close" is a judgement it can actually support.
+  abstain_gate: retrieval
+  # 1.5B is worth the extra ~2 GB here: measured F1 0.177 -> 0.250 on full evidence, and
+  # an oracle-selection run shows the generator, not the retriever, is what limits answer
+  # quality once evidence is chosen well.
+  generation: Qwen/Qwen2.5-1.5B-Instruct
+
 kb:
   path: data/kb
   # Sentence chunks shorter than this are merged into the neighbouring chunk, so that
