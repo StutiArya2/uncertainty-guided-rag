@@ -46,6 +46,16 @@ server:
   # Cosine similarity is bounded, calibrated and comparable across corpora, so
   # "nothing retrieved is even close" is a judgement it can actually support.
   abstain_gate: retrieval
+  # Cosine floor below which the reading room refuses. Calibrated on 21 questions over
+  # real papers (Transformer, BERT, RAG, plus an uploaded AR/VR survey), and the two
+  # populations separate cleanly:
+  #     lowest in-scope question    0.453
+  #     highest out-of-scope        0.372   ("who is the president of Brazil?")
+  # 0.40 sits in that gap: 14/14 in-scope answered, 7/7 out-of-scope refused.
+  #
+  # The gap is what makes this signal usable where the support scorer was not — there,
+  # the answer-bearing sentence scored 0.00085 and nothing separated at all.
+  retrieval_floor: 0.40
   # 1.5B is worth the extra ~2 GB here: measured F1 0.177 -> 0.250 on full evidence, and
   # an oracle-selection run shows the generator, not the retriever, is what limits answer
   # quality once evidence is chosen well.
