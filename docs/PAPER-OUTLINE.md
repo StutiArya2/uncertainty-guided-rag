@@ -199,6 +199,32 @@ baselines.
 6. **Restoration and abstention were entangled** through one threshold; separating them is
    new and only the absolute policy is used by the historical results.
 
+### 6b. The improvement study — six independent tests of one hypothesis
+
+Seven improvements were implemented and measured. They sort by a single criterion —
+**whether they depend on the support scorer's judgement** — and the sorting predicts the
+outcome exactly.
+
+| improvement | uses the support signal? | result |
+|---|---|---|
+| Qwen2.5-1.5B generator | no | **works** — F1 0.177 → 0.250 on full evidence |
+| scorer result caching | no | **works** — 141 forward passes → 0, identical numbers |
+| answer-aware verification | **replaces** it with entailment | **partial** — total-loss misses 92.9% → 64.3% |
+| cross-encoder reranking | yes | no effect — retention 20.0% → 21.1%, F1 −1.2 pp |
+| neighbour restoration | yes | **no effect on any metric** |
+| more candidates (top_k 8→16) | yes | no effect once budget-matched |
+| graded restoration | yes | marginal — +1.2 pp reduction for +31% compute |
+
+This is the paper's strongest structural argument. Six changes designed independently, all
+bounded by the same ceiling, is far better evidence about *where* the bottleneck is than
+any of the individual negative results. The support signal — which locates gold evidence
+22% of the time against a 12% chance baseline, correlation +0.045 — is the binding
+constraint on the entire design.
+
+It also predicts the one partial success: answer-aware verification is the only change
+that replaces the signal rather than consuming it, and it is the only gated-on-judgement
+change that improved anything.
+
 ### 7. What would change our mind
 
 Stated so the negative result is falsifiable rather than merely asserted:
@@ -209,8 +235,10 @@ Stated so the negative result is falsifiable rather than merely asserted:
 - A budget harsh enough that allocation dominates. We tested keep ≈ 0.65 and ≈ 0.29 and
   saw no adaptivity effect at either, but the space is not exhausted.
 - A stronger support signal. Every failure in this paper traces back to the same place:
-  the scorer cannot tell answer-bearing evidence from on-topic evidence. Fix that and both
-  the allocation policy and the restoration trigger have something real to run on.
+  the scorer cannot tell answer-bearing evidence from on-topic evidence. Fix that and the
+  allocation policy, the abstention gate and the restoration trigger all improve at once.
+  This is now demonstrated rather than argued — see §6b, where six independent attempts to
+  improve the system around that signal all hit the same ceiling.
 
 ---
 

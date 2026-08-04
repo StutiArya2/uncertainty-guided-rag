@@ -284,3 +284,34 @@ class TestRestorationPolicy:
         )
         relative.run("What is the boiling point of water?")
         assert rel_eval.calls > abs_eval.calls
+
+
+class TestAbstainGate:
+    """Which signal decides a refusal. Measured on a real uploaded paper, the sentence
+    containing the answer scored 0.00085 on the support scorer while still being the
+    top-ranked unit retrieved — the ranking is informative, the absolute scale is not.
+    Refusing a question whose answer sits at rank 1 is the worst failure the reading room
+    can produce."""
+
+    def test_support_gate_refuses_on_low_support(self, cfg, units):
+        pipeline, _, _ = build(cfg, units, scores=[0.001, 0.001])
+        answer, _ = pipeline.run("What is the boiling point of water?")
+        assert answer.abstained
+
+    def test_retrieval_gate_answers_despite_low_support(self, cfg, units):
+        """The fix: strong retrieval overrides an uninformative support score."""
+        cfg["abstain"] = dict(cfg["abstain"], gate="retrieval", low_retrieval_score=0.25)
+        pipeline, _, _ = build(cfg, units, scores=[0.001, 0.001])
+        answer, _ = pipeline.run("What is the boiling point of water?")
+        assert not answer.abstained
+
+    def test_retrieval_gate_still_refuses_when_nothing_is_close(self, cfg, units):
+        """It must remain able to say no, or the honesty claim is gone entirely."""
+        cfg["abstain"] = dict(cfg["abstain"], gate="retrieval", low_retrieval_score=0.25)
+        pipeline, _, _ = build(cfg, units, scores=[0.99], score_fn=lambda i: 0.05)
+        answer, _ = pipeline.run("What is the boiling point of water?")
+        assert answer.abstained
+
+    def test_default_gate_is_unchanged(self, cfg, units):
+        """Archived experiments must keep the behaviour they were measured with."""
+        assert cfg.get_path("abstain.gate", "support") == "support"

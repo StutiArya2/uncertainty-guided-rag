@@ -417,6 +417,25 @@ class Pipeline:
         trace.restoration_triggered = restoration_triggered
         unsupported = [v.claim for v in verdicts if not v.is_sufficient]
 
+        if self.cfg.get_path("abstain.gate", "support") == "retrieval":
+            # Abstain on *retrieval* score instead of support score.
+            #
+            # The support scorer cannot carry this decision. Measured on a real uploaded
+            # paper, the sentence literally containing the answer scored 0.00085 — and it
+            # was still the highest-scoring unit retrieved. The ranking is informative;
+            # the absolute scale is not, so any fixed cut either refuses everything or
+            # refuses nothing. Refusing a question whose answer is sitting at rank 1 is
+            # the worst failure this interface can produce.
+            #
+            # Cosine similarity is bounded, comparable across corpora, and calibrated:
+            # "nothing retrieved is even close" is a judgement it can actually support.
+            floor = float(self.cfg.get_path("abstain.low_retrieval_score", 0.25))
+            best = max(
+                (u.retrieval_score for item in final_evidence for u in item.units),
+                default=0.0,
+            )
+            unsupported = [] if best >= floor else [e.claim for e in final_evidence]
+
         # End-to-end prompt cost, measured against the same prompt built from the *full*
         # evidence. Both are needed: the difference between them is the reduction actually
         # paid for, as opposed to the reduction in evidence text, which ignores every
