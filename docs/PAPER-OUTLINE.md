@@ -51,11 +51,18 @@ Supporting results:
    baseline quality at 48.9% reduction with a **0%** dangerous-miss rate, which is the
    target a detector should be measured against.
 
-5. **Compression is quality-neutral.** identity − uncertainty_guided: +0.0120 F1,
-   CI [−0.0171, +0.0410], p=0.42.
+5. **Compression costs quality, and how much depends on the generator.** identity −
+   uncertainty_guided is +0.0120 F1 (p=0.42, not significant) on Qwen2.5-0.5B but
+   **+0.0540, CI [+0.0300, +0.0798], p=0.0001** on Qwen2.5-1.5B. The smaller model cannot
+   exploit the evidence being removed, so it cannot miss it. **Report the generator with
+   every compression number**, and treat an identity arm scoring near the floor as a
+   warning that the experiment cannot detect what it is measuring.
 
 ## What we must not claim
 
+- **Not** "compression is free." It costs 5.4 F1 points on a competent generator. The
+  free-lunch version of this claim survived three weeks only because the generator was too
+  weak to notice, and it is exactly the claim a reviewer with a bigger model would break.
 - **Not** "uncertainty-guided compression works." It does not, and we tested it properly.
 - **Not** "the system knows when it doesn't know." 11 unanswerable questions cannot
   support that, and the evidence-level results argue against it.
