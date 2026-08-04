@@ -40,6 +40,12 @@ restriction, the baseline scored ~1% F1 and abstained on 83% of answerable quest
 
 ### What the evidence supports
 
+> **Compression is not free.** An earlier version of this README claimed ~39% token
+> reduction "at no measurable quality cost". That held only on a Qwen2.5-0.5B generator,
+> which was too weak to exploit the evidence being removed. On Qwen2.5-1.5B the same
+> compression costs **5.4 answer-F1 points** (0.2497 → 0.1957, p=0.0001). The trade is
+> real and defensible; it was simply not the trade being claimed.
+
 **1. Reversible compression turns selection quality into a cost curve — and the exchange
 rate is set by how well the system detects its own losses.** Ranked selection beats random
 selection at the same nominal budget, and by *twice as much* once the loss detector is
@@ -71,11 +77,17 @@ where compression removed needed evidence, and 77.9% where it removed *all* of i
 than hidden — and it is now a measurable target where the project previously had an
 untested safety assertion.
 
-**4. An oracle selector says the headroom is in cost and safety, not accuracy.** Keeping
-exactly the human-marked evidence reaches F1 0.1785 against ranked selection's 0.1649 — a
-gap that is not significant (p=0.27). The generator limits answer quality, not the
-selector. But the oracle reaches baseline quality at 48.9% reduction with a **0%** miss
-rate, which is what a detector should be judged against.
+**4. An oracle selector reaches baseline quality at 48.9% reduction with a 0% miss rate.**
+On the 0.5B generator its quality edge over ranked selection was not significant (+0.0136,
+p=0.27) — consistent with that model being the bottleneck rather than the selector. What
+the oracle does establish unambiguously is the safety target: perfect selection never
+drops needed evidence, so a detector should be measured against 0%, not against the
+`absolute` trigger's 76.5%.
+
+**5. Results depend on the generator, so it is named everywhere.** Qwen2.5-0.5B is the
+default because the archived runs used it; Qwen2.5-1.5B is the robustness check and is
+where the compression cost becomes visible. Any compression result is implicitly a claim
+about the model it was measured on, and a cheap model will understate the cost.
 
 ```bash
 # reproduce; every JSON records its own commit, config, dataset and model revisions
