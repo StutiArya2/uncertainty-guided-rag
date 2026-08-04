@@ -413,3 +413,51 @@ class TestGradedRestoration:
         compressed = compress([claim_evidence], cfg=cfg)[0]
         for unit in restore_partial(compressed, 1).units:
             assert unit.verify_against(corpus)
+
+
+class TestNeighbourRestoration:
+    """Sentence chunking is what makes reversibility exact, but it severs a claim from its
+    context. A dropped chunk adjacent in the source text to a kept one is the cheapest
+    possible guess at that missing context — no model call, just adjacency."""
+
+    def test_restores_the_chunk_immediately_after_a_kept_one(self, claim_evidence, cfg):
+        from src.restoration import restore_neighbours
+
+        compressed = compress([claim_evidence], cfg=cfg)[0]
+        kept_ends = {(u.span.doc_id, u.span.end) for u in compressed.kept}
+        expected = [
+            u for u in compressed.dropped
+            if any(u.span.doc_id == d and abs(u.span.start - e) <= 2 for d, e in kept_ends)
+        ]
+        restored = restore_neighbours(compressed).units
+        for unit in expected:
+            assert unit in restored
+
+    def test_does_not_restore_distant_chunks(self, claim_evidence, cfg):
+        """The point is a cheap cohesion repair, not a disguised full restoration."""
+        from src.restoration import restore_neighbours
+
+        compressed = compress([claim_evidence], cfg=cfg)[0]
+        restored = restore_neighbours(compressed)
+        assert len(restored.units) <= len(compressed.kept) + len(compressed.dropped)
+
+    def test_never_loses_a_kept_unit(self, claim_evidence, cfg):
+        from src.restoration import restore_neighbours
+
+        compressed = compress([claim_evidence], cfg=cfg)[0]
+        restored = restore_neighbours(compressed).units
+        for unit in compressed.kept:
+            assert unit in restored
+
+    def test_nothing_dropped_means_nothing_added(self, claim_evidence, cfg):
+        from src.restoration import restore_neighbours
+
+        compressed = compress([claim_evidence], cfg=cfg, mode="identity")[0]
+        assert signature(restore_neighbours(compressed).units) == signature(compressed.kept)
+
+    def test_neighbours_are_still_exactly_reversible(self, claim_evidence, corpus, cfg):
+        from src.restoration import restore_neighbours
+
+        compressed = compress([claim_evidence], cfg=cfg)[0]
+        for unit in restore_neighbours(compressed).units:
+            assert unit.verify_against(corpus)

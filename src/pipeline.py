@@ -28,7 +28,12 @@ from .config import Config, default_config
 from .evaluation import SupportEvaluator
 from .evidence_mapping import map_evidence
 from .generation import Generator, abstain, build_prompt, generate_answer
-from .restoration import restore, restore_partial, restoration_ladder
+from .restoration import (
+    restore,
+    restore_neighbours,
+    restore_partial,
+    restoration_ladder,
+)
 from .rerank import Reranker, rerank_evidence
 from .retrieval import Retriever
 from .tokens import TokenCounter, shared_counter
@@ -203,6 +208,15 @@ class Pipeline:
 
         The trade is scoring passes for tokens: each rung costs one more evaluation.
         """
+        # Cheapest rung first: a dropped chunk sitting next to a kept one is usually the
+        # context that chunk was severed from, and recovering it needs no scoring at all.
+        if bool(self.cfg.get_path("restoration.neighbours_first", False)):
+            current = restore_neighbours(comp)
+            if len(current.units) > len(comp.kept):
+                verdict = self.evaluator.evaluate(comp.claim, current.units)
+                if verdict.is_sufficient:
+                    return current, verdict
+
         step = int(self.cfg.get_path("restoration.step", 0))
         if step <= 0:
             current = restore(comp)
