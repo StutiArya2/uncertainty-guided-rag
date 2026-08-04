@@ -69,7 +69,9 @@ def server_config():
         cfg["models"] = dict(cfg["models"], generation=block["generation"])
 
     cfg["abstain"] = dict(
-        cfg["abstain"], gate=block.get("abstain_gate", "retrieval")
+        cfg["abstain"],
+        gate=block.get("abstain_gate", "retrieval"),
+        low_retrieval_score=float(block.get("retrieval_floor", 0.40)),
     )
     return cfg
 
