@@ -201,6 +201,14 @@ restoration:
   # correctly dropped.
   step: 0
 
+  # Try the dropped chunks *adjacent in the source text* to a kept one before anything
+  # else. Sentence chunking is what makes reversibility exact, but it severs a claim from
+  # its context — "The function has two tunable parameters." and the sentence naming them
+  # become separate units. A neighbour is the cheapest possible guess at that missing
+  # context: no model call, no scoring, just adjacency. It is a *cohesion* repair, where
+  # restoring the next-best by score is a *relevance* one, and they fix different things.
+  neighbours_first: false
+
 abstain:
   # If every retrieved candidate for a claim scores below this, the KB likely lacks the
   # answer -> recommend retrieve-more rather than clarify.

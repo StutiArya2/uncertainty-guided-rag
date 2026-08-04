@@ -102,6 +102,51 @@ def restore_partial(compressed: CompressedEvidence, n: int) -> ClaimEvidence:
     )
 
 
+def restore_neighbours(compressed: CompressedEvidence) -> ClaimEvidence:
+    """Reinstate dropped units that sit immediately beside a kept one in the source text.
+
+    Sentence chunking is what makes reversibility exact, but it splits a claim from its
+    context: "The function has two tunable parameters." and the sentence that names them
+    become separate units, and compression can keep one without the other. A chunk's
+    neighbours are the cheapest possible guess at its missing context — no model call, no
+    scoring, just adjacency in the document.
+
+    Cheaper than full restoration and more targeted than restoring the next-best by score,
+    because "next best" is a *relevance* judgement and this is a *cohesion* one. The two
+    are different repairs and the neighbour is often the one actually needed.
+    """
+    kept = list(compressed.kept)
+    if not kept or not compressed.dropped:
+        return restore_partial(compressed, 0)
+
+    # Adjacency is measured in the source document, not in rank order.
+    ends = {(u.span.doc_id, u.span.end) for u in kept}
+    starts = {(u.span.doc_id, u.span.start) for u in kept}
+
+    neighbours = [
+        u
+        for u in compressed.dropped
+        # A dropped unit that ends where a kept one begins, or begins where one ends,
+        # allowing a small gap for the whitespace between sentences.
+        if any(
+            u.span.doc_id == doc_id and abs(u.span.end - start) <= 2
+            for doc_id, start in starts
+        )
+        or any(
+            u.span.doc_id == doc_id and abs(u.span.start - end) <= 2
+            for doc_id, end in ends
+        )
+    ]
+
+    units = _ordered(kept + neighbours)
+    return ClaimEvidence(
+        claim=compressed.claim,
+        units=units,
+        token_count=sum(u.token_count for u in units),
+        uncertainty=compressed.uncertainty,
+    )
+
+
 def restoration_ladder(compressed: CompressedEvidence, step: int) -> list[int]:
     """How many units to reinstate at each attempt, ending at everything dropped.
 
