@@ -1,0 +1,3014 @@
+{
+ "provenance": {
+  "timestamp_utc": "2026-11-17T05:52:22+00:00",
+  "command": "scripts/measure_retrieval.py --questions data/qasper/questions.yaml --kb data/qasper/kb --modes bm25 --compare-run artifacts/qasper-main/tight_relative.json --json artifacts/retrieval-recall/bm25_vs_dense.json",
+  "git": {
+   "commit": "d6abf098a25236eaac88fa4ed6fa964d416b48d4",
+   "branch": "claude/hybrid-retrieval-and-fixes",
+   "dirty": true,
+   "dirty_inputs": false,
+   "dirty_files": [
+    "?? artifacts/retrieval-recall/"
+   ],
+   "dirty_input_files": []
+  },
+  "models": {
+   "embedding": {
+    "id": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": null
+   },
+   "generation": {
+    "id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "revision": null
+   },
+   "support": {
+    "role": "relevance",
+    "id": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "revision": null
+   }
+  },
+  "device": "cpu",
+  "environment": {
+   "python": "3.13.18",
+   "torch": null,
+   "transformers": null,
+   "numpy": "2.5.3",
+   "yaml": "6.0.3",
+   "platform": "Linux-6.18.44-fc-v553-x86_64-with-glibc2.39",
+   "machine": "x86_64"
+  },
+  "config": {
+   "models": {
+    "embedding": "sentence-transformers/all-MiniLM-L6-v2",
+    "generation": "Qwen/Qwen2.5-0.5B-Instruct",
+    "device": "auto"
+   },
+   "server": {
+    "contextualize": false,
+    "support_threshold": 0.01,
+    "abstain_gate": "retrieval",
+    "retrieval_floor": 0.4,
+    "generation": "Qwen/Qwen2.5-1.5B-Instruct"
+   },
+   "kb": {
+    "path": "data/kb",
+    "min_chunk_chars": 40,
+    "max_chunk_chars": 600
+   },
+   "retrieval": {
+    "top_k": 8,
+    "mode": "dense",
+    "bm25": {
+     "k1": 1.2,
+     "b": 0.75
+    },
+    "rrf_k": 60,
+    "cache_dir": ".cache/embeddings"
+   },
+   "rerank": {
+    "enabled": false,
+    "scorer": "relevance",
+    "model": null
+   },
+   "claims": {
+    "strategy": "heuristic",
+    "max_claims": 6
+   },
+   "uncertainty": {
+    "estimator": "retrieval_score",
+    "w_score": 0.6,
+    "w_margin": 0.4,
+    "margin_scale": 0.15
+   },
+   "compression": {
+    "min_keep": 0.25,
+    "max_keep": 1.0,
+    "floor_units": 1,
+    "fixed_keep": 0.6,
+    "random_seed": 20260803
+   },
+   "evaluation": {
+    "scorer": "relevance",
+    "contextualize": true,
+    "aggregate": "max",
+    "scorers": {
+     "relevance": {
+      "model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+      "threshold": 0.15
+     },
+     "nli": {
+      "model": "MoritzLaurer/DeBERTa-v3-large-mnli-fever-anli-ling-wanli",
+      "threshold": 0.55
+     }
+    }
+   },
+   "verification": {
+    "scorer": "nli",
+    "entailment_threshold": 0.5,
+    "max_claims": 6
+   },
+   "restoration": {
+    "policy": "absolute",
+    "retain_fraction": 0.9,
+    "step": 0,
+    "neighbours_first": false
+   },
+   "abstain": {
+    "low_retrieval_score": 0.25,
+    "ambiguous_claim_count": 3
+   },
+   "generation": {
+    "max_new_tokens": 256,
+    "temperature": 0.0,
+    "style": "prose",
+    "styles": {
+     "prose": {
+      "system": "You answer strictly from the evidence provided. Do not add facts that are not in the evidence. Keep the answer to a few sentences.",
+      "instruction": "Answer the question using only the evidence below.",
+      "max_new_tokens": 256
+     },
+     "extractive": {
+      "system": "You answer strictly from the evidence provided, in as few words as possible. Copy the answer from the evidence verbatim where you can. Give only the answer itself \u2014 no restatement of the question, no explanation, no full sentence unless the answer is genuinely a sentence. For a yes/no question answer exactly \"Yes\" or \"No\".",
+      "instruction": "Answer the question using only the evidence below. Reply with the answer only, in as few words as possible.",
+      "max_new_tokens": 48
+     }
+    }
+   }
+  },
+  "dataset": {
+   "questions": {
+    "path": "data/qasper/questions.yaml",
+    "sha256": "8ac3c9cba769baa79ed74613d675cbcfed56437423ac72936dc80988861036f4"
+   },
+   "kb": {
+    "path": "data/qasper/kb",
+    "n_documents": 110,
+    "manifest_sha256": "1ade256b9a57b8a1a3e4c598ab9f9fbc20a15590ccc3adfbab0060ae6bf3011e"
+   }
+  }
+ },
+ "top_k": 8,
+ "alignment": {
+  "evidence": 676,
+  "aligned": 567,
+  "table_or_figure": 66,
+  "unmatched": 43,
+  "questions_with_evidence": 275,
+  "questions_usable": 255
+ },
+ "modes": [
+  {
+   "mode": "dense (archived: tight_relative.json)",
+   "source": {
+    "path": "artifacts/qasper-main/tight_relative.json",
+    "commit": "85691213fed72666fbd338098134816a703db003",
+    "top_k": 8
+   },
+   "rows": [
+    {
+     "index": 0,
+     "paper": "cross_lingual_pre_training_based_transfer_for_zero_shot_neur",
+     "recall": 0.0
+    },
+    {
+     "index": 1,
+     "paper": "cross_lingual_pre_training_based_transfer_for_zero_shot_neur",
+     "recall": 0.14210526315789473
+    },
+    {
+     "index": 2,
+     "paper": "cross_lingual_pre_training_based_transfer_for_zero_shot_neur",
+     "recall": 0.0
+    },
+    {
+     "index": 3,
+     "paper": "cross_lingual_pre_training_based_transfer_for_zero_shot_neur",
+     "recall": 0.5246449456975772
+    },
+    {
+     "index": 4,
+     "paper": "pioner_datasets_and_baselines_for_armenian_named_entity_reco",
+     "recall": 0.7533333333333333
+    },
+    {
+     "index": 5,
+     "paper": "pioner_datasets_and_baselines_for_armenian_named_entity_reco",
+     "recall": 0.0
+    },
+    {
+     "index": 6,
+     "paper": "pioner_datasets_and_baselines_for_armenian_named_entity_reco",
+     "recall": 0.24035087719298245
+    },
+    {
+     "index": 7,
+     "paper": "identifying_dogmatism_in_social_media_signals_and_models",
+     "recall": 0.0
+    },
+    {
+     "index": 8,
+     "paper": "identifying_dogmatism_in_social_media_signals_and_models",
+     "recall": 0.0
+    },
+    {
+     "index": 10,
+     "paper": "adversarial_learning_for_chinese_ner_from_crowd_annotations",
+     "recall": 0.0
+    },
+    {
+     "index": 11,
+     "paper": "addressing_word_order_divergence_in_multilingual_neural_mach",
+     "recall": 0.9972677595628415
+    },
+    {
+     "index": 12,
+     "paper": "addressing_word_order_divergence_in_multilingual_neural_mach",
+     "recall": 0.0
+    },
+    {
+     "index": 13,
+     "paper": "addressing_word_order_divergence_in_multilingual_neural_mach",
+     "recall": 0.5676691729323309
+    },
+    {
+     "index": 14,
+     "paper": "a_corpus_for_automatic_readability_assessment_and_text_simpl",
+     "recall": 0.0
+    },
+    {
+     "index": 15,
+     "paper": "a_corpus_for_automatic_readability_assessment_and_text_simpl",
+     "recall": 0.3190984578884935
+    },
+    {
+     "index": 16,
+     "paper": "improved_neural_relation_detection_for_knowledge_base_questi",
+     "recall": 0.0
+    },
+    {
+     "index": 17,
+     "paper": "improved_neural_relation_detection_for_knowledge_base_questi",
+     "recall": 0.0
+    },
+    {
+     "index": 18,
+     "paper": "improved_neural_relation_detection_for_knowledge_base_questi",
+     "recall": 1.0
+    },
+    {
+     "index": 19,
+     "paper": "improved_neural_relation_detection_for_knowledge_base_questi",
+     "recall": 0.0
+    },
+    {
+     "index": 20,
+     "paper": "how_contextual_are_contextualized_word_representations_compa",
+     "recall": 0.09711846318036287
+    },
+    {
+     "index": 21,
+     "paper": "how_contextual_are_contextualized_word_representations_compa",
+     "recall": 1.0
+    },
+    {
+     "index": 22,
+     "paper": "sensitive_data_detection_and_classification_in_spanish_clini",
+     "recall": 0.0
+    },
+    {
+     "index": 23,
+     "paper": "sensitive_data_detection_and_classification_in_spanish_clini",
+     "recall": 0.04146039603960396
+    },
+    {
+     "index": 24,
+     "paper": "sensitive_data_detection_and_classification_in_spanish_clini",
+     "recall": 0.0
+    },
+    {
+     "index": 25,
+     "paper": "sensitive_data_detection_and_classification_in_spanish_clini",
+     "recall": 0.4597902097902098
+    },
+    {
+     "index": 26,
+     "paper": "massively_multilingual_neural_grapheme_to_phoneme_conversion",
+     "recall": 0.0
+    },
+    {
+     "index": 27,
+     "paper": "massively_multilingual_neural_grapheme_to_phoneme_conversion",
+     "recall": 0.0
+    },
+    {
+     "index": 28,
+     "paper": "massively_multilingual_neural_grapheme_to_phoneme_conversion",
+     "recall": 0.5620437956204379
+    },
+    {
+     "index": 29,
+     "paper": "massively_multilingual_neural_grapheme_to_phoneme_conversion",
+     "recall": 0.0
+    },
+    {
+     "index": 31,
+     "paper": "abstractive_summarization_for_low_resource_data_using_domain",
+     "recall": 0.3130779392338177
+    },
+    {
+     "index": 32,
+     "paper": "abstractive_summarization_for_low_resource_data_using_domain",
+     "recall": 0.21414141414141413
+    },
+    {
+     "index": 33,
+     "paper": "abstractive_summarization_for_low_resource_data_using_domain",
+     "recall": 0.3622291021671827
+    },
+    {
+     "index": 34,
+     "paper": "abstractive_summarization_for_low_resource_data_using_domain",
+     "recall": 0.0
+    },
+    {
+     "index": 35,
+     "paper": "extreme_language_model_compression_with_optimal_subwords_and",
+     "recall": 0.0
+    },
+    {
+     "index": 36,
+     "paper": "extreme_language_model_compression_with_optimal_subwords_and",
+     "recall": 0.0
+    },
+    {
+     "index": 38,
+     "paper": "stereotyping_and_bias_in_the_flickr30k_dataset",
+     "recall": 0.17845117845117844
+    },
+    {
+     "index": 39,
+     "paper": "stereotyping_and_bias_in_the_flickr30k_dataset",
+     "recall": 0.036737235367372355
+    },
+    {
+     "index": 40,
+     "paper": "stereotyping_and_bias_in_the_flickr30k_dataset",
+     "recall": 0.2100350058343057
+    },
+    {
+     "index": 41,
+     "paper": "improving_implicit_discourse_relation_classification_by_mode",
+     "recall": 0.18879855465221318
+    },
+    {
+     "index": 42,
+     "paper": "improving_implicit_discourse_relation_classification_by_mode",
+     "recall": 0.10520487264673312
+    },
+    {
+     "index": 43,
+     "paper": "knowledge_based_machine_reading_comprehension",
+     "recall": 0.31357254290171604
+    },
+    {
+     "index": 44,
+     "paper": "assessing_bert_s_syntactic_abilities",
+     "recall": 0.11392405063291139
+    },
+    {
+     "index": 45,
+     "paper": "stateology_state_level_interactive_charting_of_language_feel",
+     "recall": 0.0
+    },
+    {
+     "index": 46,
+     "paper": "stateology_state_level_interactive_charting_of_language_feel",
+     "recall": 0.6739130434782609
+    },
+    {
+     "index": 47,
+     "paper": "stateology_state_level_interactive_charting_of_language_feel",
+     "recall": 0.5124378109452736
+    },
+    {
+     "index": 48,
+     "paper": "medication_regimen_extraction_from_clinical_conversations",
+     "recall": 0.0
+    },
+    {
+     "index": 49,
+     "paper": "medication_regimen_extraction_from_clinical_conversations",
+     "recall": 1.0
+    },
+    {
+     "index": 50,
+     "paper": "medication_regimen_extraction_from_clinical_conversations",
+     "recall": 0.5313725490196078
+    },
+    {
+     "index": 51,
+     "paper": "hierarchical_transformers_for_long_document_classification",
+     "recall": 0.045344129554655874
+    },
+    {
+     "index": 52,
+     "paper": "hierarchical_transformers_for_long_document_classification",
+     "recall": 0.0
+    },
+    {
+     "index": 53,
+     "paper": "data_collection_for_interactive_learning_through_the_dialog",
+     "recall": 0.1334355828220859
+    },
+    {
+     "index": 54,
+     "paper": "data_collection_for_interactive_learning_through_the_dialog",
+     "recall": 0.0
+    },
+    {
+     "index": 55,
+     "paper": "learning_autocomplete_systems_as_a_communication_game",
+     "recall": 0.0
+    },
+    {
+     "index": 56,
+     "paper": "learning_autocomplete_systems_as_a_communication_game",
+     "recall": 0.0
+    },
+    {
+     "index": 57,
+     "paper": "learning_autocomplete_systems_as_a_communication_game",
+     "recall": 1.0
+    },
+    {
+     "index": 58,
+     "paper": "learning_autocomplete_systems_as_a_communication_game",
+     "recall": 1.0
+    },
+    {
+     "index": 59,
+     "paper": "multipurpose_intelligent_process_automation_via_conversation",
+     "recall": 0.0
+    },
+    {
+     "index": 60,
+     "paper": "multipurpose_intelligent_process_automation_via_conversation",
+     "recall": 0.0
+    },
+    {
+     "index": 61,
+     "paper": "multipurpose_intelligent_process_automation_via_conversation",
+     "recall": 0.21143617021276595
+    },
+    {
+     "index": 62,
+     "paper": "identification_of_indian_languages_using_ghost_vlad_pooling",
+     "recall": 0.7206645898234684
+    },
+    {
+     "index": 63,
+     "paper": "identification_of_indian_languages_using_ghost_vlad_pooling",
+     "recall": 0.25116279069767444
+    },
+    {
+     "index": 64,
+     "paper": "identification_of_indian_languages_using_ghost_vlad_pooling",
+     "recall": 1.0
+    },
+    {
+     "index": 65,
+     "paper": "unsupervised_learning_of_syntactic_structure_with_invertible",
+     "recall": 0.0
+    },
+    {
+     "index": 66,
+     "paper": "unsupervised_learning_of_syntactic_structure_with_invertible",
+     "recall": 0.0
+    },
+    {
+     "index": 67,
+     "paper": "unsupervised_learning_of_syntactic_structure_with_invertible",
+     "recall": 0.5085470085470085
+    },
+    {
+     "index": 68,
+     "paper": "conflict_as_an_inverse_of_attention_in_sequence_relationship",
+     "recall": 0.28924418604651164
+    },
+    {
+     "index": 69,
+     "paper": "conflict_as_an_inverse_of_attention_in_sequence_relationship",
+     "recall": 0.0
+    },
+    {
+     "index": 70,
+     "paper": "conflict_as_an_inverse_of_attention_in_sequence_relationship",
+     "recall": 0.0
+    },
+    {
+     "index": 72,
+     "paper": "multilingual_clustering_of_streaming_news",
+     "recall": 0.5884146341463414
+    },
+    {
+     "index": 73,
+     "paper": "multilingual_clustering_of_streaming_news",
+     "recall": 0.6755555555555556
+    },
+    {
+     "index": 75,
+     "paper": "inexpensive_domain_adaptation_of_pretrained_language_models_",
+     "recall": 0.0
+    },
+    {
+     "index": 78,
+     "paper": "toward_multilingual_neural_machine_translation_with_universa",
+     "recall": 0.0
+    },
+    {
+     "index": 79,
+     "paper": "toward_multilingual_neural_machine_translation_with_universa",
+     "recall": 0.2846441947565543
+    },
+    {
+     "index": 80,
+     "paper": "what_does_my_qa_model_know_devising_controlled_probes_using_",
+     "recall": 0.06969865039748567
+    },
+    {
+     "index": 81,
+     "paper": "what_does_my_qa_model_know_devising_controlled_probes_using_",
+     "recall": 0.7967359050445104
+    },
+    {
+     "index": 82,
+     "paper": "what_does_my_qa_model_know_devising_controlled_probes_using_",
+     "recall": 0.3640776699029126
+    },
+    {
+     "index": 83,
+     "paper": "what_does_my_qa_model_know_devising_controlled_probes_using_",
+     "recall": 0.0
+    },
+    {
+     "index": 84,
+     "paper": "what_does_my_qa_model_know_devising_controlled_probes_using_",
+     "recall": 1.0
+    },
+    {
+     "index": 85,
+     "paper": "copenhagen_at_conll_sigmorphon_2018_multilingual_inflection_",
+     "recall": 0.23325635103926096
+    },
+    {
+     "index": 87,
+     "paper": "copenhagen_at_conll_sigmorphon_2018_multilingual_inflection_",
+     "recall": 1.0
+    },
+    {
+     "index": 88,
+     "paper": "copenhagen_at_conll_sigmorphon_2018_multilingual_inflection_",
+     "recall": 1.0
+    },
+    {
+     "index": 89,
+     "paper": "copenhagen_at_conll_sigmorphon_2018_multilingual_inflection_",
+     "recall": 1.0
+    },
+    {
+     "index": 92,
+     "paper": "stochastic_answer_networks_for_squad_2_0",
+     "recall": 0.9029850746268657
+    },
+    {
+     "index": 93,
+     "paper": "stochastic_answer_networks_for_squad_2_0",
+     "recall": 0.0
+    },
+    {
+     "index": 94,
+     "paper": "stochastic_answer_networks_for_squad_2_0",
+     "recall": 0.11126373626373626
+    },
+    {
+     "index": 95,
+     "paper": "clustering_comparable_corpora_of_russian_and_ukrainian_acade",
+     "recall": 1.0
+    },
+    {
+     "index": 96,
+     "paper": "how_to_avoid_being_eaten_by_a_grue_exploration_strategies_fo",
+     "recall": 0.0
+    },
+    {
+     "index": 97,
+     "paper": "how_to_avoid_being_eaten_by_a_grue_exploration_strategies_fo",
+     "recall": 0.0
+    },
+    {
+     "index": 98,
+     "paper": "how_to_avoid_being_eaten_by_a_grue_exploration_strategies_fo",
+     "recall": 0.0
+    },
+    {
+     "index": 100,
+     "paper": "towards_a_continuous_knowledge_learning_engine_for_chatbots",
+     "recall": 0.13513513513513514
+    },
+    {
+     "index": 102,
+     "paper": "towards_a_continuous_knowledge_learning_engine_for_chatbots",
+     "recall": 0.0706401766004415
+    },
+    {
+     "index": 103,
+     "paper": "towards_a_continuous_knowledge_learning_engine_for_chatbots",
+     "recall": 0.0
+    },
+    {
+     "index": 104,
+     "paper": "towards_a_continuous_knowledge_learning_engine_for_chatbots",
+     "recall": 0.0
+    },
+    {
+     "index": 105,
+     "paper": "adaptive_semi_supervised_learning_for_cross_domain_sentiment",
+     "recall": 0.2722567287784679
+    },
+    {
+     "index": 106,
+     "paper": "adaptive_semi_supervised_learning_for_cross_domain_sentiment",
+     "recall": 0.0
+    },
+    {
+     "index": 107,
+     "paper": "adaptive_semi_supervised_learning_for_cross_domain_sentiment",
+     "recall": 0.09227348526959422
+    },
+    {
+     "index": 108,
+     "paper": "adaptive_semi_supervised_learning_for_cross_domain_sentiment",
+     "recall": 0.14180929095354522
+    },
+    {
+     "index": 109,
+     "paper": "how_big_is_big_enough_unsupervised_word_sense_disambiguation",
+     "recall": 1.0
+    },
+    {
+     "index": 110,
+     "paper": "how_big_is_big_enough_unsupervised_word_sense_disambiguation",
+     "recall": 0.30973451327433627
+    },
+    {
+     "index": 111,
+     "paper": "women_in_isis_propaganda_a_natural_language_processing_analy",
+     "recall": 0.43089430894308944
+    },
+    {
+     "index": 112,
+     "paper": "women_in_isis_propaganda_a_natural_language_processing_analy",
+     "recall": 0.0
+    },
+    {
+     "index": 113,
+     "paper": "women_in_isis_propaganda_a_natural_language_processing_analy",
+     "recall": 0.34809474768280124
+    },
+    {
+     "index": 114,
+     "paper": "women_in_isis_propaganda_a_natural_language_processing_analy",
+     "recall": 0.07774049217002237
+    },
+    {
+     "index": 115,
+     "paper": "women_in_isis_propaganda_a_natural_language_processing_analy",
+     "recall": 0.0
+    },
+    {
+     "index": 116,
+     "paper": "going_beneath_the_surface_evaluating_image_captioning_for_gr",
+     "recall": 0.0
+    },
+    {
+     "index": 117,
+     "paper": "going_beneath_the_surface_evaluating_image_captioning_for_gr",
+     "recall": 0.0
+    },
+    {
+     "index": 118,
+     "paper": "going_beneath_the_surface_evaluating_image_captioning_for_gr",
+     "recall": 0.0
+    },
+    {
+     "index": 119,
+     "paper": "going_beneath_the_surface_evaluating_image_captioning_for_gr",
+     "recall": 0.729776247848537
+    },
+    {
+     "index": 120,
+     "paper": "integrating_boundary_assembling_into_a_dnn_framework_for_nam",
+     "recall": 0.0
+    },
+    {
+     "index": 121,
+     "paper": "integrating_boundary_assembling_into_a_dnn_framework_for_nam",
+     "recall": 0.3392539964476021
+    },
+    {
+     "index": 122,
+     "paper": "integrating_boundary_assembling_into_a_dnn_framework_for_nam",
+     "recall": 0.0
+    },
+    {
+     "index": 123,
+     "paper": "zero_shot_reading_comprehension_by_cross_lingual_transfer_le",
+     "recall": 0.0
+    },
+    {
+     "index": 124,
+     "paper": "zero_shot_reading_comprehension_by_cross_lingual_transfer_le",
+     "recall": 0.0
+    },
+    {
+     "index": 125,
+     "paper": "zero_shot_reading_comprehension_by_cross_lingual_transfer_le",
+     "recall": 0.0
+    },
+    {
+     "index": 126,
+     "paper": "zero_shot_reading_comprehension_by_cross_lingual_transfer_le",
+     "recall": 0.0
+    },
+    {
+     "index": 127,
+     "paper": "multimodal_named_entity_recognition_for_short_social_media_p",
+     "recall": 0.0
+    },
+    {
+     "index": 128,
+     "paper": "multimodal_named_entity_recognition_for_short_social_media_p",
+     "recall": 0.26876876876876876
+    },
+    {
+     "index": 129,
+     "paper": "multimodal_named_entity_recognition_for_short_social_media_p",
+     "recall": 0.0
+    },
+    {
+     "index": 130,
+     "paper": "multimodal_named_entity_recognition_for_short_social_media_p",
+     "recall": 0.0
+    },
+    {
+     "index": 131,
+     "paper": "multimodal_named_entity_recognition_for_short_social_media_p",
+     "recall": 1.0
+    },
+    {
+     "index": 132,
+     "paper": "step_sequence_to_sequence_transformer_pre_training_for_docum",
+     "recall": 0.23423423423423423
+    },
+    {
+     "index": 134,
+     "paper": "what_does_attention_in_neural_machine_translation_pay_attent",
+     "recall": 0.1821561338289963
+    },
+    {
+     "index": 135,
+     "paper": "what_does_attention_in_neural_machine_translation_pay_attent",
+     "recall": 0.0
+    },
+    {
+     "index": 136,
+     "paper": "what_does_attention_in_neural_machine_translation_pay_attent",
+     "recall": 0.0
+    },
+    {
+     "index": 137,
+     "paper": "active_learning_for_speech_recognition_the_power_of_gradient",
+     "recall": 0.08769633507853403
+    },
+    {
+     "index": 138,
+     "paper": "active_learning_for_speech_recognition_the_power_of_gradient",
+     "recall": 1.0
+    },
+    {
+     "index": 139,
+     "paper": "active_learning_for_speech_recognition_the_power_of_gradient",
+     "recall": 0.29571106094808125
+    },
+    {
+     "index": 140,
+     "paper": "active_learning_for_speech_recognition_the_power_of_gradient",
+     "recall": 0.3235294117647059
+    },
+    {
+     "index": 141,
+     "paper": "dynamic_compositionality_in_recursive_neural_networks_with_s",
+     "recall": 0.0
+    },
+    {
+     "index": 142,
+     "paper": "causal_explanation_analysis_on_social_media",
+     "recall": 0.0
+    },
+    {
+     "index": 143,
+     "paper": "causal_explanation_analysis_on_social_media",
+     "recall": 0.0
+    },
+    {
+     "index": 144,
+     "paper": "an_evaluation_dataset_for_intent_classification_and_out_of_s",
+     "recall": 0.7981651376146789
+    },
+    {
+     "index": 145,
+     "paper": "an_evaluation_dataset_for_intent_classification_and_out_of_s",
+     "recall": 0.1943127962085308
+    },
+    {
+     "index": 146,
+     "paper": "an_evaluation_dataset_for_intent_classification_and_out_of_s",
+     "recall": 0.9972826086956522
+    },
+    {
+     "index": 147,
+     "paper": "an_evaluation_dataset_for_intent_classification_and_out_of_s",
+     "recall": 0.053811659192825115
+    },
+    {
+     "index": 148,
+     "paper": "dice_loss_for_data_imbalanced_nlp_tasks",
+     "recall": 0.4703125
+    },
+    {
+     "index": 149,
+     "paper": "dice_loss_for_data_imbalanced_nlp_tasks",
+     "recall": 0.8338870431893688
+    },
+    {
+     "index": 150,
+     "paper": "dice_loss_for_data_imbalanced_nlp_tasks",
+     "recall": 0.2974588938714499
+    },
+    {
+     "index": 151,
+     "paper": "dice_loss_for_data_imbalanced_nlp_tasks",
+     "recall": 0.10872424375274002
+    },
+    {
+     "index": 152,
+     "paper": "handling_divergent_reference_texts_when_evaluating_table_to_",
+     "recall": 1.0
+    },
+    {
+     "index": 153,
+     "paper": "handling_divergent_reference_texts_when_evaluating_table_to_",
+     "recall": 0.0
+    },
+    {
+     "index": 154,
+     "paper": "handling_divergent_reference_texts_when_evaluating_table_to_",
+     "recall": 0.0
+    },
+    {
+     "index": 157,
+     "paper": "quasi_recurrent_neural_networks",
+     "recall": 0.7354260089686099
+    },
+    {
+     "index": 158,
+     "paper": "quasi_recurrent_neural_networks",
+     "recall": 0.344578313253012
+    },
+    {
+     "index": 159,
+     "paper": "neuronblocks_building_your_nlp_dnn_models_like_playing_lego",
+     "recall": 0.6011730205278593
+    },
+    {
+     "index": 160,
+     "paper": "neuronblocks_building_your_nlp_dnn_models_like_playing_lego",
+     "recall": 0.02924901185770751
+    },
+    {
+     "index": 161,
+     "paper": "neuronblocks_building_your_nlp_dnn_models_like_playing_lego",
+     "recall": 0.0
+    },
+    {
+     "index": 162,
+     "paper": "a_comprehensive_comparison_of_machine_learning_based_methods",
+     "recall": 0.0
+    },
+    {
+     "index": 163,
+     "paper": "a_comprehensive_comparison_of_machine_learning_based_methods",
+     "recall": 1.0
+    },
+    {
+     "index": 164,
+     "paper": "english_japanese_neural_machine_translation_with_encoder_dec",
+     "recall": 0.9979338842975206
+    },
+    {
+     "index": 165,
+     "paper": "english_japanese_neural_machine_translation_with_encoder_dec",
+     "recall": 1.0
+    },
+    {
+     "index": 166,
+     "paper": "extractive_summarization_of_long_documents_by_combining_glob",
+     "recall": 1.0
+    },
+    {
+     "index": 167,
+     "paper": "extractive_summarization_of_long_documents_by_combining_glob",
+     "recall": 0.0
+    },
+    {
+     "index": 169,
+     "paper": "findings_of_the_nlp4if_2019_shared_task_on_fine_grained_prop",
+     "recall": 0.0
+    },
+    {
+     "index": 170,
+     "paper": "findings_of_the_nlp4if_2019_shared_task_on_fine_grained_prop",
+     "recall": 1.0
+    },
+    {
+     "index": 172,
+     "paper": "improving_correlation_with_human_judgments_by_integrating_se",
+     "recall": 1.0
+    },
+    {
+     "index": 173,
+     "paper": "improving_correlation_with_human_judgments_by_integrating_se",
+     "recall": 0.0
+    },
+    {
+     "index": 174,
+     "paper": "character_level_question_answering_with_attention",
+     "recall": 1.0
+    },
+    {
+     "index": 175,
+     "paper": "character_level_question_answering_with_attention",
+     "recall": 0.0
+    },
+    {
+     "index": 177,
+     "paper": "improving_the_performance_of_neural_machine_translation_invo",
+     "recall": 0.24733475479744135
+    },
+    {
+     "index": 178,
+     "paper": "to_swap_or_not_to_swap_exploiting_dependency_word_pairs_for_",
+     "recall": 0.0
+    },
+    {
+     "index": 179,
+     "paper": "fine_grained_named_entity_recognition_using_elmo_and_wikidat",
+     "recall": 1.0
+    },
+    {
+     "index": 180,
+     "paper": "fine_grained_named_entity_recognition_using_elmo_and_wikidat",
+     "recall": 0.0
+    },
+    {
+     "index": 181,
+     "paper": "fine_grained_named_entity_recognition_using_elmo_and_wikidat",
+     "recall": 0.3435225618631732
+    },
+    {
+     "index": 182,
+     "paper": "a_resource_for_computational_experiments_on_mapudungun",
+     "recall": 0.0
+    },
+    {
+     "index": 183,
+     "paper": "a_resource_for_computational_experiments_on_mapudungun",
+     "recall": 0.7971014492753623
+    },
+    {
+     "index": 184,
+     "paper": "a_matter_of_words_nlp_for_quality_evaluation_of_wikipedia_me",
+     "recall": 0.0
+    },
+    {
+     "index": 185,
+     "paper": "why_so_down_the_role_of_negative_and_positive_pointwise_mutu",
+     "recall": 0.0
+    },
+    {
+     "index": 186,
+     "paper": "why_so_down_the_role_of_negative_and_positive_pointwise_mutu",
+     "recall": 0.5794392523364486
+    },
+    {
+     "index": 187,
+     "paper": "why_so_down_the_role_of_negative_and_positive_pointwise_mutu",
+     "recall": 0.0
+    },
+    {
+     "index": 188,
+     "paper": "why_so_down_the_role_of_negative_and_positive_pointwise_mutu",
+     "recall": 0.3598130841121495
+    },
+    {
+     "index": 189,
+     "paper": "towards_speech_to_text_translation_without_speech_recognitio",
+     "recall": 1.0
+    },
+    {
+     "index": 190,
+     "paper": "towards_speech_to_text_translation_without_speech_recognitio",
+     "recall": 0.37825278810408924
+    },
+    {
+     "index": 191,
+     "paper": "towards_speech_to_text_translation_without_speech_recognitio",
+     "recall": 0.0
+    },
+    {
+     "index": 192,
+     "paper": "understanding_language_elicited_eeg_data_by_predicting_it_fr",
+     "recall": 0.8736842105263158
+    },
+    {
+     "index": 193,
+     "paper": "understanding_language_elicited_eeg_data_by_predicting_it_fr",
+     "recall": 0.453551912568306
+    },
+    {
+     "index": 194,
+     "paper": "external_lexical_information_for_multilingual_part_of_speech",
+     "recall": 0.0
+    },
+    {
+     "index": 195,
+     "paper": "external_lexical_information_for_multilingual_part_of_speech",
+     "recall": 1.0
+    },
+    {
+     "index": 198,
+     "paper": "disunited_nations_a_multiplex_network_approach_to_detecting_",
+     "recall": 0.0
+    },
+    {
+     "index": 201,
+     "paper": "mining_supervisor_evaluation_and_peer_feedback_in_performanc",
+     "recall": 0.5343511450381679
+    },
+    {
+     "index": 202,
+     "paper": "mining_supervisor_evaluation_and_peer_feedback_in_performanc",
+     "recall": 1.0
+    },
+    {
+     "index": 203,
+     "paper": "mining_supervisor_evaluation_and_peer_feedback_in_performanc",
+     "recall": 0.0
+    },
+    {
+     "index": 204,
+     "paper": "mining_supervisor_evaluation_and_peer_feedback_in_performanc",
+     "recall": 0.0
+    },
+    {
+     "index": 205,
+     "paper": "mining_supervisor_evaluation_and_peer_feedback_in_performanc",
+     "recall": 0.0
+    },
+    {
+     "index": 206,
+     "paper": "mining_supervisor_evaluation_and_peer_feedback_in_performanc",
+     "recall": 0.9943820224719101
+    },
+    {
+     "index": 207,
+     "paper": "mining_supervisor_evaluation_and_peer_feedback_in_performanc",
+     "recall": 0.0
+    },
+    {
+     "index": 208,
+     "paper": "sparse_and_constrained_attention_for_neural_machine_translat",
+     "recall": 0.683206106870229
+    },
+    {
+     "index": 209,
+     "paper": "gluoncv_and_gluonnlp_deep_learning_in_computer_vision_and_na",
+     "recall": 0.0
+    },
+    {
+     "index": 210,
+     "paper": "a_framework_for_evaluation_of_machine_reading_comprehension_",
+     "recall": 1.0
+    },
+    {
+     "index": 211,
+     "paper": "a_framework_for_evaluation_of_machine_reading_comprehension_",
+     "recall": 0.0
+    },
+    {
+     "index": 212,
+     "paper": "a_framework_for_evaluation_of_machine_reading_comprehension_",
+     "recall": 0.0
+    },
+    {
+     "index": 213,
+     "paper": "a_framework_for_evaluation_of_machine_reading_comprehension_",
+     "recall": 0.28547297297297297
+    },
+    {
+     "index": 214,
+     "paper": "an_iterative_approach_for_identifying_complaint_based_tweets",
+     "recall": 0.2903752039151713
+    },
+    {
+     "index": 215,
+     "paper": "an_iterative_approach_for_identifying_complaint_based_tweets",
+     "recall": 0.0
+    },
+    {
+     "index": 216,
+     "paper": "bridging_the_gap_between_pre_training_and_fine_tuning_for_en",
+     "recall": 0.2809346787041954
+    },
+    {
+     "index": 217,
+     "paper": "bridging_the_gap_between_pre_training_and_fine_tuning_for_en",
+     "recall": 1.0
+    },
+    {
+     "index": 218,
+     "paper": "dialog_context_language_modeling_with_recurrent_neural_netwo",
+     "recall": 0.0
+    },
+    {
+     "index": 219,
+     "paper": "mitigating_the_impact_of_speech_recognition_errors_on_spoken",
+     "recall": 0.0
+    },
+    {
+     "index": 220,
+     "paper": "mitigating_the_impact_of_speech_recognition_errors_on_spoken",
+     "recall": 1.0
+    },
+    {
+     "index": 221,
+     "paper": "mitigating_the_impact_of_speech_recognition_errors_on_spoken",
+     "recall": 1.0
+    },
+    {
+     "index": 222,
+     "paper": "mitigating_the_impact_of_speech_recognition_errors_on_spoken",
+     "recall": 0.39425587467362927
+    },
+    {
+     "index": 223,
+     "paper": "word2vec_optimal_hyper_parameters_and_their_impact_on_nlp_do",
+     "recall": 1.0
+    },
+    {
+     "index": 224,
+     "paper": "word2vec_optimal_hyper_parameters_and_their_impact_on_nlp_do",
+     "recall": 1.0
+    },
+    {
+     "index": 225,
+     "paper": "word2vec_optimal_hyper_parameters_and_their_impact_on_nlp_do",
+     "recall": 1.0
+    },
+    {
+     "index": 226,
+     "paper": "word2vec_optimal_hyper_parameters_and_their_impact_on_nlp_do",
+     "recall": 0.0
+    },
+    {
+     "index": 227,
+     "paper": "table_to_text_generation_with_effective_hierarchical_encoder",
+     "recall": 0.0
+    },
+    {
+     "index": 228,
+     "paper": "table_to_text_generation_with_effective_hierarchical_encoder",
+     "recall": 0.0
+    },
+    {
+     "index": 229,
+     "paper": "conversational_flow_in_oxford_style_debates",
+     "recall": 0.0
+    },
+    {
+     "index": 232,
+     "paper": "robust_named_entity_recognition_in_idiosyncratic_domains",
+     "recall": 0.0
+    },
+    {
+     "index": 235,
+     "paper": "offensive_language_detection_a_comparative_analysis",
+     "recall": 0.0
+    },
+    {
+     "index": 236,
+     "paper": "edinburgh_neural_machine_translation_systems_for_wmt_16",
+     "recall": 0.05299145299145299
+    },
+    {
+     "index": 237,
+     "paper": "equation_embeddings",
+     "recall": 0.16287878787878787
+    },
+    {
+     "index": 238,
+     "paper": "equation_embeddings",
+     "recall": 0.20373376623376624
+    },
+    {
+     "index": 239,
+     "paper": "template_free_data_to_text_generation_of_finnish_sports_news",
+     "recall": 0.15831894070236038
+    },
+    {
+     "index": 241,
+     "paper": "feature_studies_to_inform_the_classification_of_depressive_s",
+     "recall": 0.46646646646646645
+    },
+    {
+     "index": 243,
+     "paper": "feature_studies_to_inform_the_classification_of_depressive_s",
+     "recall": 0.9952830188679245
+    },
+    {
+     "index": 244,
+     "paper": "extracting_clinical_concepts_from_user_queries",
+     "recall": 1.0
+    },
+    {
+     "index": 245,
+     "paper": "extracting_clinical_concepts_from_user_queries",
+     "recall": 0.0
+    },
+    {
+     "index": 246,
+     "paper": "attention_based_wav2text_with_feature_transfer_learning",
+     "recall": 0.5010245901639344
+    },
+    {
+     "index": 247,
+     "paper": "attention_based_wav2text_with_feature_transfer_learning",
+     "recall": 0.4372384937238494
+    },
+    {
+     "index": 248,
+     "paper": "attention_based_wav2text_with_feature_transfer_learning",
+     "recall": 0.0
+    },
+    {
+     "index": 249,
+     "paper": "contextualize_show_and_tell_a_neural_visual_storyteller",
+     "recall": 0.4806701030927835
+    },
+    {
+     "index": 250,
+     "paper": "contextualize_show_and_tell_a_neural_visual_storyteller",
+     "recall": 0.0
+    },
+    {
+     "index": 251,
+     "paper": "contextualize_show_and_tell_a_neural_visual_storyteller",
+     "recall": 1.0
+    },
+    {
+     "index": 252,
+     "paper": "contextualize_show_and_tell_a_neural_visual_storyteller",
+     "recall": 0.7070866141732284
+    },
+    {
+     "index": 253,
+     "paper": "dolores_deep_contextualized_knowledge_graph_embeddings",
+     "recall": 0.6742934051144011
+    },
+    {
+     "index": 254,
+     "paper": "dolores_deep_contextualized_knowledge_graph_embeddings",
+     "recall": 0.0
+    },
+    {
+     "index": 256,
+     "paper": "sentiment_analysis_of_twitter_data_for_predicting_stock_mark",
+     "recall": 0.5244897959183673
+    },
+    {
+     "index": 257,
+     "paper": "sentiment_analysis_of_twitter_data_for_predicting_stock_mark",
+     "recall": 1.0
+    },
+    {
+     "index": 258,
+     "paper": "sentiment_analysis_of_twitter_data_for_predicting_stock_mark",
+     "recall": 0.0
+    },
+    {
+     "index": 259,
+     "paper": "tttttackling_winogrande_schemas",
+     "recall": 1.0
+    },
+    {
+     "index": 260,
+     "paper": "from_free_text_to_clusters_of_content_in_health_records_an_u",
+     "recall": 0.0
+    },
+    {
+     "index": 261,
+     "paper": "examining_gender_and_race_bias_in_two_hundred_sentiment_anal",
+     "recall": 0.0
+    },
+    {
+     "index": 262,
+     "paper": "examining_gender_and_race_bias_in_two_hundred_sentiment_anal",
+     "recall": 0.2893013100436681
+    },
+    {
+     "index": 263,
+     "paper": "jasper_an_end_to_end_convolutional_neural_acoustic_model",
+     "recall": 0.0
+    },
+    {
+     "index": 264,
+     "paper": "jasper_an_end_to_end_convolutional_neural_acoustic_model",
+     "recall": 0.18733850129198967
+    },
+    {
+     "index": 265,
+     "paper": "towards_multimodal_understanding_of_passenger_vehicle_intera",
+     "recall": 0.0
+    },
+    {
+     "index": 266,
+     "paper": "towards_multimodal_understanding_of_passenger_vehicle_intera",
+     "recall": 1.0
+    },
+    {
+     "index": 268,
+     "paper": "vais_asr_building_a_conversational_speech_recognition_system",
+     "recall": 0.18213058419243985
+    },
+    {
+     "index": 269,
+     "paper": "vais_asr_building_a_conversational_speech_recognition_system",
+     "recall": 0.0
+    },
+    {
+     "index": 270,
+     "paper": "vais_asr_building_a_conversational_speech_recognition_system",
+     "recall": 1.0
+    },
+    {
+     "index": 271,
+     "paper": "symmetric_regularization_based_bert_for_pair_wise_semantic_r",
+     "recall": 0.5463414634146342
+    },
+    {
+     "index": 272,
+     "paper": "symmetric_regularization_based_bert_for_pair_wise_semantic_r",
+     "recall": 0.08963282937365011
+    },
+    {
+     "index": 273,
+     "paper": "symmetric_regularization_based_bert_for_pair_wise_semantic_r",
+     "recall": 0.0
+    },
+    {
+     "index": 274,
+     "paper": "impact_of_batch_size_on_stopping_active_learning_for_text_cl",
+     "recall": 0.0
+    },
+    {
+     "index": 275,
+     "paper": "impact_of_batch_size_on_stopping_active_learning_for_text_cl",
+     "recall": 1.0
+    },
+    {
+     "index": 276,
+     "paper": "exploiting_out_of_domain_parallel_data_through_multilingual_",
+     "recall": 0.0
+    },
+    {
+     "index": 277,
+     "paper": "automatic_discourse_segmentation_an_evaluation_in_french",
+     "recall": 0.24866310160427807
+    },
+    {
+     "index": 278,
+     "paper": "crowdsourcing_for_beyond_polarity_sentiment_analysis_a_pure_",
+     "recall": 0.0
+    },
+    {
+     "index": 280,
+     "paper": "high_quality_elmo_embeddings_for_seven_less_resourced_langua",
+     "recall": 0.0
+    },
+    {
+     "index": 282,
+     "paper": "fully_convolutional_speech_recognition",
+     "recall": 0.3103448275862069
+    },
+    {
+     "index": 283,
+     "paper": "affective_behaviour_analysis_of_on_line_user_interactions_ar",
+     "recall": 0.3907563025210084
+    },
+    {
+     "index": 284,
+     "paper": "affective_behaviour_analysis_of_on_line_user_interactions_ar",
+     "recall": 1.0
+    },
+    {
+     "index": 285,
+     "paper": "the_effect_of_heterogeneous_data_for_alzheimer_s_disease_det",
+     "recall": 0.05168986083499006
+    },
+    {
+     "index": 286,
+     "paper": "natural_language_processing_via_lda_topic_model_in_recommend",
+     "recall": 0.4236417033773862
+    }
+   ],
+   "questions": 255,
+   "found": 147,
+   "found_rate": 0.5764705882352941,
+   "recall": 0.3177539542363115,
+   "recall_given_found": 0.5512058389813567
+  },
+  {
+   "mode": "bm25",
+   "rows": [
+    {
+     "index": 0,
+     "paper": "cross_lingual_pre_training_based_transfer_for_zero_shot_neur",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 1,
+     "paper": "cross_lingual_pre_training_based_transfer_for_zero_shot_neur",
+     "recall": 0.18596491228070175,
+     "n_candidates": 8
+    },
+    {
+     "index": 2,
+     "paper": "cross_lingual_pre_training_based_transfer_for_zero_shot_neur",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 3,
+     "paper": "cross_lingual_pre_training_based_transfer_for_zero_shot_neur",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 4,
+     "paper": "pioner_datasets_and_baselines_for_armenian_named_entity_reco",
+     "recall": 0.30333333333333334,
+     "n_candidates": 8
+    },
+    {
+     "index": 5,
+     "paper": "pioner_datasets_and_baselines_for_armenian_named_entity_reco",
+     "recall": 0.6468646864686468,
+     "n_candidates": 8
+    },
+    {
+     "index": 6,
+     "paper": "pioner_datasets_and_baselines_for_armenian_named_entity_reco",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 7,
+     "paper": "identifying_dogmatism_in_social_media_signals_and_models",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 8,
+     "paper": "identifying_dogmatism_in_social_media_signals_and_models",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 10,
+     "paper": "adversarial_learning_for_chinese_ner_from_crowd_annotations",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 11,
+     "paper": "addressing_word_order_divergence_in_multilingual_neural_mach",
+     "recall": 0.2896174863387978,
+     "n_candidates": 8
+    },
+    {
+     "index": 12,
+     "paper": "addressing_word_order_divergence_in_multilingual_neural_mach",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 13,
+     "paper": "addressing_word_order_divergence_in_multilingual_neural_mach",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 14,
+     "paper": "a_corpus_for_automatic_readability_assessment_and_text_simpl",
+     "recall": 0.6791744840525328,
+     "n_candidates": 8
+    },
+    {
+     "index": 15,
+     "paper": "a_corpus_for_automatic_readability_assessment_and_text_simpl",
+     "recall": 0.5599051008303677,
+     "n_candidates": 8
+    },
+    {
+     "index": 16,
+     "paper": "improved_neural_relation_detection_for_knowledge_base_questi",
+     "recall": 0.3688073394495413,
+     "n_candidates": 8
+    },
+    {
+     "index": 17,
+     "paper": "improved_neural_relation_detection_for_knowledge_base_questi",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 18,
+     "paper": "improved_neural_relation_detection_for_knowledge_base_questi",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 19,
+     "paper": "improved_neural_relation_detection_for_knowledge_base_questi",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 20,
+     "paper": "how_contextual_are_contextualized_word_representations_compa",
+     "recall": 0.09711846318036287,
+     "n_candidates": 8
+    },
+    {
+     "index": 21,
+     "paper": "how_contextual_are_contextualized_word_representations_compa",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 22,
+     "paper": "sensitive_data_detection_and_classification_in_spanish_clini",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 23,
+     "paper": "sensitive_data_detection_and_classification_in_spanish_clini",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 24,
+     "paper": "sensitive_data_detection_and_classification_in_spanish_clini",
+     "recall": 0.13357933579335793,
+     "n_candidates": 8
+    },
+    {
+     "index": 25,
+     "paper": "sensitive_data_detection_and_classification_in_spanish_clini",
+     "recall": 0.38374125874125875,
+     "n_candidates": 8
+    },
+    {
+     "index": 26,
+     "paper": "massively_multilingual_neural_grapheme_to_phoneme_conversion",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 27,
+     "paper": "massively_multilingual_neural_grapheme_to_phoneme_conversion",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 28,
+     "paper": "massively_multilingual_neural_grapheme_to_phoneme_conversion",
+     "recall": 0.35474452554744523,
+     "n_candidates": 8
+    },
+    {
+     "index": 29,
+     "paper": "massively_multilingual_neural_grapheme_to_phoneme_conversion",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 31,
+     "paper": "abstractive_summarization_for_low_resource_data_using_domain",
+     "recall": 0.31175693527080584,
+     "n_candidates": 8
+    },
+    {
+     "index": 32,
+     "paper": "abstractive_summarization_for_low_resource_data_using_domain",
+     "recall": 0.07272727272727272,
+     "n_candidates": 8
+    },
+    {
+     "index": 33,
+     "paper": "abstractive_summarization_for_low_resource_data_using_domain",
+     "recall": 0.3188854489164087,
+     "n_candidates": 8
+    },
+    {
+     "index": 34,
+     "paper": "abstractive_summarization_for_low_resource_data_using_domain",
+     "recall": 0.5703517587939698,
+     "n_candidates": 8
+    },
+    {
+     "index": 35,
+     "paper": "extreme_language_model_compression_with_optimal_subwords_and",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 36,
+     "paper": "extreme_language_model_compression_with_optimal_subwords_and",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 38,
+     "paper": "stereotyping_and_bias_in_the_flickr30k_dataset",
+     "recall": 0.17845117845117844,
+     "n_candidates": 8
+    },
+    {
+     "index": 39,
+     "paper": "stereotyping_and_bias_in_the_flickr30k_dataset",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 40,
+     "paper": "stereotyping_and_bias_in_the_flickr30k_dataset",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 41,
+     "paper": "improving_implicit_discourse_relation_classification_by_mode",
+     "recall": 0.18879855465221318,
+     "n_candidates": 8
+    },
+    {
+     "index": 42,
+     "paper": "improving_implicit_discourse_relation_classification_by_mode",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 43,
+     "paper": "knowledge_based_machine_reading_comprehension",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 44,
+     "paper": "assessing_bert_s_syntactic_abilities",
+     "recall": 0.11392405063291139,
+     "n_candidates": 8
+    },
+    {
+     "index": 45,
+     "paper": "stateology_state_level_interactive_charting_of_language_feel",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 46,
+     "paper": "stateology_state_level_interactive_charting_of_language_feel",
+     "recall": 0.40301003344481606,
+     "n_candidates": 8
+    },
+    {
+     "index": 47,
+     "paper": "stateology_state_level_interactive_charting_of_language_feel",
+     "recall": 0.5124378109452736,
+     "n_candidates": 8
+    },
+    {
+     "index": 48,
+     "paper": "medication_regimen_extraction_from_clinical_conversations",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 49,
+     "paper": "medication_regimen_extraction_from_clinical_conversations",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 50,
+     "paper": "medication_regimen_extraction_from_clinical_conversations",
+     "recall": 0.5313725490196078,
+     "n_candidates": 8
+    },
+    {
+     "index": 51,
+     "paper": "hierarchical_transformers_for_long_document_classification",
+     "recall": 0.22348178137651822,
+     "n_candidates": 8
+    },
+    {
+     "index": 52,
+     "paper": "hierarchical_transformers_for_long_document_classification",
+     "recall": 0.15873015873015872,
+     "n_candidates": 8
+    },
+    {
+     "index": 53,
+     "paper": "data_collection_for_interactive_learning_through_the_dialog",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 54,
+     "paper": "data_collection_for_interactive_learning_through_the_dialog",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 55,
+     "paper": "learning_autocomplete_systems_as_a_communication_game",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 56,
+     "paper": "learning_autocomplete_systems_as_a_communication_game",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 57,
+     "paper": "learning_autocomplete_systems_as_a_communication_game",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 58,
+     "paper": "learning_autocomplete_systems_as_a_communication_game",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 59,
+     "paper": "multipurpose_intelligent_process_automation_via_conversation",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 60,
+     "paper": "multipurpose_intelligent_process_automation_via_conversation",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 61,
+     "paper": "multipurpose_intelligent_process_automation_via_conversation",
+     "recall": 0.21143617021276595,
+     "n_candidates": 8
+    },
+    {
+     "index": 62,
+     "paper": "identification_of_indian_languages_using_ghost_vlad_pooling",
+     "recall": 0.7985462097611631,
+     "n_candidates": 8
+    },
+    {
+     "index": 63,
+     "paper": "identification_of_indian_languages_using_ghost_vlad_pooling",
+     "recall": 0.25116279069767444,
+     "n_candidates": 8
+    },
+    {
+     "index": 64,
+     "paper": "identification_of_indian_languages_using_ghost_vlad_pooling",
+     "recall": 0.5737704918032787,
+     "n_candidates": 8
+    },
+    {
+     "index": 65,
+     "paper": "unsupervised_learning_of_syntactic_structure_with_invertible",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 66,
+     "paper": "unsupervised_learning_of_syntactic_structure_with_invertible",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 67,
+     "paper": "unsupervised_learning_of_syntactic_structure_with_invertible",
+     "recall": 0.5085470085470085,
+     "n_candidates": 8
+    },
+    {
+     "index": 68,
+     "paper": "conflict_as_an_inverse_of_attention_in_sequence_relationship",
+     "recall": 0.40843023255813954,
+     "n_candidates": 8
+    },
+    {
+     "index": 69,
+     "paper": "conflict_as_an_inverse_of_attention_in_sequence_relationship",
+     "recall": 0.2706896551724138,
+     "n_candidates": 8
+    },
+    {
+     "index": 70,
+     "paper": "conflict_as_an_inverse_of_attention_in_sequence_relationship",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 72,
+     "paper": "multilingual_clustering_of_streaming_news",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 73,
+     "paper": "multilingual_clustering_of_streaming_news",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 75,
+     "paper": "inexpensive_domain_adaptation_of_pretrained_language_models_",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 78,
+     "paper": "toward_multilingual_neural_machine_translation_with_universa",
+     "recall": 0.3128898128898129,
+     "n_candidates": 8
+    },
+    {
+     "index": 79,
+     "paper": "toward_multilingual_neural_machine_translation_with_universa",
+     "recall": 0.2846441947565543,
+     "n_candidates": 8
+    },
+    {
+     "index": 80,
+     "paper": "what_does_my_qa_model_know_devising_controlled_probes_using_",
+     "recall": 0.012848955444629322,
+     "n_candidates": 8
+    },
+    {
+     "index": 81,
+     "paper": "what_does_my_qa_model_know_devising_controlled_probes_using_",
+     "recall": 0.7967359050445104,
+     "n_candidates": 8
+    },
+    {
+     "index": 82,
+     "paper": "what_does_my_qa_model_know_devising_controlled_probes_using_",
+     "recall": 0.3640776699029126,
+     "n_candidates": 8
+    },
+    {
+     "index": 83,
+     "paper": "what_does_my_qa_model_know_devising_controlled_probes_using_",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 84,
+     "paper": "what_does_my_qa_model_know_devising_controlled_probes_using_",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 85,
+     "paper": "copenhagen_at_conll_sigmorphon_2018_multilingual_inflection_",
+     "recall": 0.23325635103926096,
+     "n_candidates": 8
+    },
+    {
+     "index": 87,
+     "paper": "copenhagen_at_conll_sigmorphon_2018_multilingual_inflection_",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 88,
+     "paper": "copenhagen_at_conll_sigmorphon_2018_multilingual_inflection_",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 89,
+     "paper": "copenhagen_at_conll_sigmorphon_2018_multilingual_inflection_",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 92,
+     "paper": "stochastic_answer_networks_for_squad_2_0",
+     "recall": 0.44029850746268656,
+     "n_candidates": 8
+    },
+    {
+     "index": 93,
+     "paper": "stochastic_answer_networks_for_squad_2_0",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 94,
+     "paper": "stochastic_answer_networks_for_squad_2_0",
+     "recall": 0.11126373626373626,
+     "n_candidates": 8
+    },
+    {
+     "index": 95,
+     "paper": "clustering_comparable_corpora_of_russian_and_ukrainian_acade",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 96,
+     "paper": "how_to_avoid_being_eaten_by_a_grue_exploration_strategies_fo",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 97,
+     "paper": "how_to_avoid_being_eaten_by_a_grue_exploration_strategies_fo",
+     "recall": 0.4131386861313869,
+     "n_candidates": 8
+    },
+    {
+     "index": 98,
+     "paper": "how_to_avoid_being_eaten_by_a_grue_exploration_strategies_fo",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 100,
+     "paper": "towards_a_continuous_knowledge_learning_engine_for_chatbots",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 102,
+     "paper": "towards_a_continuous_knowledge_learning_engine_for_chatbots",
+     "recall": 0.2041942604856512,
+     "n_candidates": 8
+    },
+    {
+     "index": 103,
+     "paper": "towards_a_continuous_knowledge_learning_engine_for_chatbots",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 104,
+     "paper": "towards_a_continuous_knowledge_learning_engine_for_chatbots",
+     "recall": 0.05995864920744314,
+     "n_candidates": 8
+    },
+    {
+     "index": 105,
+     "paper": "adaptive_semi_supervised_learning_for_cross_domain_sentiment",
+     "recall": 0.34886128364389235,
+     "n_candidates": 8
+    },
+    {
+     "index": 106,
+     "paper": "adaptive_semi_supervised_learning_for_cross_domain_sentiment",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 107,
+     "paper": "adaptive_semi_supervised_learning_for_cross_domain_sentiment",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 108,
+     "paper": "adaptive_semi_supervised_learning_for_cross_domain_sentiment",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 109,
+     "paper": "how_big_is_big_enough_unsupervised_word_sense_disambiguation",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 110,
+     "paper": "how_big_is_big_enough_unsupervised_word_sense_disambiguation",
+     "recall": 0.4690265486725664,
+     "n_candidates": 8
+    },
+    {
+     "index": 111,
+     "paper": "women_in_isis_propaganda_a_natural_language_processing_analy",
+     "recall": 0.5650406504065041,
+     "n_candidates": 8
+    },
+    {
+     "index": 112,
+     "paper": "women_in_isis_propaganda_a_natural_language_processing_analy",
+     "recall": 0.2374727668845316,
+     "n_candidates": 8
+    },
+    {
+     "index": 113,
+     "paper": "women_in_isis_propaganda_a_natural_language_processing_analy",
+     "recall": 0.34809474768280124,
+     "n_candidates": 8
+    },
+    {
+     "index": 114,
+     "paper": "women_in_isis_propaganda_a_natural_language_processing_analy",
+     "recall": 0.19910514541387025,
+     "n_candidates": 8
+    },
+    {
+     "index": 115,
+     "paper": "women_in_isis_propaganda_a_natural_language_processing_analy",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 116,
+     "paper": "going_beneath_the_surface_evaluating_image_captioning_for_gr",
+     "recall": 0.15045871559633028,
+     "n_candidates": 8
+    },
+    {
+     "index": 117,
+     "paper": "going_beneath_the_surface_evaluating_image_captioning_for_gr",
+     "recall": 0.22023809523809523,
+     "n_candidates": 8
+    },
+    {
+     "index": 118,
+     "paper": "going_beneath_the_surface_evaluating_image_captioning_for_gr",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 119,
+     "paper": "going_beneath_the_surface_evaluating_image_captioning_for_gr",
+     "recall": 0.46987951807228917,
+     "n_candidates": 8
+    },
+    {
+     "index": 120,
+     "paper": "integrating_boundary_assembling_into_a_dnn_framework_for_nam",
+     "recall": 0.8548387096774194,
+     "n_candidates": 8
+    },
+    {
+     "index": 121,
+     "paper": "integrating_boundary_assembling_into_a_dnn_framework_for_nam",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 122,
+     "paper": "integrating_boundary_assembling_into_a_dnn_framework_for_nam",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 123,
+     "paper": "zero_shot_reading_comprehension_by_cross_lingual_transfer_le",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 124,
+     "paper": "zero_shot_reading_comprehension_by_cross_lingual_transfer_le",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 125,
+     "paper": "zero_shot_reading_comprehension_by_cross_lingual_transfer_le",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 126,
+     "paper": "zero_shot_reading_comprehension_by_cross_lingual_transfer_le",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 127,
+     "paper": "multimodal_named_entity_recognition_for_short_social_media_p",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 128,
+     "paper": "multimodal_named_entity_recognition_for_short_social_media_p",
+     "recall": 0.26876876876876876,
+     "n_candidates": 8
+    },
+    {
+     "index": 129,
+     "paper": "multimodal_named_entity_recognition_for_short_social_media_p",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 130,
+     "paper": "multimodal_named_entity_recognition_for_short_social_media_p",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 131,
+     "paper": "multimodal_named_entity_recognition_for_short_social_media_p",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 132,
+     "paper": "step_sequence_to_sequence_transformer_pre_training_for_docum",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 134,
+     "paper": "what_does_attention_in_neural_machine_translation_pay_attent",
+     "recall": 0.1821561338289963,
+     "n_candidates": 8
+    },
+    {
+     "index": 135,
+     "paper": "what_does_attention_in_neural_machine_translation_pay_attent",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 136,
+     "paper": "what_does_attention_in_neural_machine_translation_pay_attent",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 137,
+     "paper": "active_learning_for_speech_recognition_the_power_of_gradient",
+     "recall": 0.08769633507853403,
+     "n_candidates": 8
+    },
+    {
+     "index": 138,
+     "paper": "active_learning_for_speech_recognition_the_power_of_gradient",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 139,
+     "paper": "active_learning_for_speech_recognition_the_power_of_gradient",
+     "recall": 0.06320541760722348,
+     "n_candidates": 8
+    },
+    {
+     "index": 140,
+     "paper": "active_learning_for_speech_recognition_the_power_of_gradient",
+     "recall": 0.17647058823529413,
+     "n_candidates": 8
+    },
+    {
+     "index": 141,
+     "paper": "dynamic_compositionality_in_recursive_neural_networks_with_s",
+     "recall": 0.2607361963190184,
+     "n_candidates": 8
+    },
+    {
+     "index": 142,
+     "paper": "causal_explanation_analysis_on_social_media",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 143,
+     "paper": "causal_explanation_analysis_on_social_media",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 144,
+     "paper": "an_evaluation_dataset_for_intent_classification_and_out_of_s",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 145,
+     "paper": "an_evaluation_dataset_for_intent_classification_and_out_of_s",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 146,
+     "paper": "an_evaluation_dataset_for_intent_classification_and_out_of_s",
+     "recall": 0.14402173913043478,
+     "n_candidates": 8
+    },
+    {
+     "index": 147,
+     "paper": "an_evaluation_dataset_for_intent_classification_and_out_of_s",
+     "recall": 0.4977578475336323,
+     "n_candidates": 8
+    },
+    {
+     "index": 148,
+     "paper": "dice_loss_for_data_imbalanced_nlp_tasks",
+     "recall": 0.4703125,
+     "n_candidates": 8
+    },
+    {
+     "index": 149,
+     "paper": "dice_loss_for_data_imbalanced_nlp_tasks",
+     "recall": 0.7524916943521595,
+     "n_candidates": 8
+    },
+    {
+     "index": 150,
+     "paper": "dice_loss_for_data_imbalanced_nlp_tasks",
+     "recall": 0.2974588938714499,
+     "n_candidates": 8
+    },
+    {
+     "index": 151,
+     "paper": "dice_loss_for_data_imbalanced_nlp_tasks",
+     "recall": 0.10872424375274002,
+     "n_candidates": 8
+    },
+    {
+     "index": 152,
+     "paper": "handling_divergent_reference_texts_when_evaluating_table_to_",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 153,
+     "paper": "handling_divergent_reference_texts_when_evaluating_table_to_",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 154,
+     "paper": "handling_divergent_reference_texts_when_evaluating_table_to_",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 157,
+     "paper": "quasi_recurrent_neural_networks",
+     "recall": 0.3094170403587444,
+     "n_candidates": 8
+    },
+    {
+     "index": 158,
+     "paper": "quasi_recurrent_neural_networks",
+     "recall": 0.344578313253012,
+     "n_candidates": 8
+    },
+    {
+     "index": 159,
+     "paper": "neuronblocks_building_your_nlp_dnn_models_like_playing_lego",
+     "recall": 0.39882697947214074,
+     "n_candidates": 8
+    },
+    {
+     "index": 160,
+     "paper": "neuronblocks_building_your_nlp_dnn_models_like_playing_lego",
+     "recall": 0.2,
+     "n_candidates": 8
+    },
+    {
+     "index": 161,
+     "paper": "neuronblocks_building_your_nlp_dnn_models_like_playing_lego",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 162,
+     "paper": "a_comprehensive_comparison_of_machine_learning_based_methods",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 163,
+     "paper": "a_comprehensive_comparison_of_machine_learning_based_methods",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 164,
+     "paper": "english_japanese_neural_machine_translation_with_encoder_dec",
+     "recall": 0.9979338842975206,
+     "n_candidates": 8
+    },
+    {
+     "index": 165,
+     "paper": "english_japanese_neural_machine_translation_with_encoder_dec",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 166,
+     "paper": "extractive_summarization_of_long_documents_by_combining_glob",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 167,
+     "paper": "extractive_summarization_of_long_documents_by_combining_glob",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 169,
+     "paper": "findings_of_the_nlp4if_2019_shared_task_on_fine_grained_prop",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 170,
+     "paper": "findings_of_the_nlp4if_2019_shared_task_on_fine_grained_prop",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 172,
+     "paper": "improving_correlation_with_human_judgments_by_integrating_se",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 173,
+     "paper": "improving_correlation_with_human_judgments_by_integrating_se",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 174,
+     "paper": "character_level_question_answering_with_attention",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 175,
+     "paper": "character_level_question_answering_with_attention",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 177,
+     "paper": "improving_the_performance_of_neural_machine_translation_invo",
+     "recall": 0.26332622601279315,
+     "n_candidates": 8
+    },
+    {
+     "index": 178,
+     "paper": "to_swap_or_not_to_swap_exploiting_dependency_word_pairs_for_",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 179,
+     "paper": "fine_grained_named_entity_recognition_using_elmo_and_wikidat",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 180,
+     "paper": "fine_grained_named_entity_recognition_using_elmo_and_wikidat",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 181,
+     "paper": "fine_grained_named_entity_recognition_using_elmo_and_wikidat",
+     "recall": 0.3435225618631732,
+     "n_candidates": 8
+    },
+    {
+     "index": 182,
+     "paper": "a_resource_for_computational_experiments_on_mapudungun",
+     "recall": 0.044142614601018676,
+     "n_candidates": 8
+    },
+    {
+     "index": 183,
+     "paper": "a_resource_for_computational_experiments_on_mapudungun",
+     "recall": 0.7971014492753623,
+     "n_candidates": 8
+    },
+    {
+     "index": 184,
+     "paper": "a_matter_of_words_nlp_for_quality_evaluation_of_wikipedia_me",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 185,
+     "paper": "why_so_down_the_role_of_negative_and_positive_pointwise_mutu",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 186,
+     "paper": "why_so_down_the_role_of_negative_and_positive_pointwise_mutu",
+     "recall": 0.2834890965732087,
+     "n_candidates": 8
+    },
+    {
+     "index": 187,
+     "paper": "why_so_down_the_role_of_negative_and_positive_pointwise_mutu",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 188,
+     "paper": "why_so_down_the_role_of_negative_and_positive_pointwise_mutu",
+     "recall": 0.3598130841121495,
+     "n_candidates": 8
+    },
+    {
+     "index": 189,
+     "paper": "towards_speech_to_text_translation_without_speech_recognitio",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 190,
+     "paper": "towards_speech_to_text_translation_without_speech_recognitio",
+     "recall": 0.4674721189591078,
+     "n_candidates": 8
+    },
+    {
+     "index": 191,
+     "paper": "towards_speech_to_text_translation_without_speech_recognitio",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 192,
+     "paper": "understanding_language_elicited_eeg_data_by_predicting_it_fr",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 193,
+     "paper": "understanding_language_elicited_eeg_data_by_predicting_it_fr",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 194,
+     "paper": "external_lexical_information_for_multilingual_part_of_speech",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 195,
+     "paper": "external_lexical_information_for_multilingual_part_of_speech",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 198,
+     "paper": "disunited_nations_a_multiplex_network_approach_to_detecting_",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 201,
+     "paper": "mining_supervisor_evaluation_and_peer_feedback_in_performanc",
+     "recall": 0.5343511450381679,
+     "n_candidates": 8
+    },
+    {
+     "index": 202,
+     "paper": "mining_supervisor_evaluation_and_peer_feedback_in_performanc",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 203,
+     "paper": "mining_supervisor_evaluation_and_peer_feedback_in_performanc",
+     "recall": 0.3626373626373626,
+     "n_candidates": 8
+    },
+    {
+     "index": 204,
+     "paper": "mining_supervisor_evaluation_and_peer_feedback_in_performanc",
+     "recall": 0.5577689243027888,
+     "n_candidates": 8
+    },
+    {
+     "index": 205,
+     "paper": "mining_supervisor_evaluation_and_peer_feedback_in_performanc",
+     "recall": 0.16556291390728478,
+     "n_candidates": 8
+    },
+    {
+     "index": 206,
+     "paper": "mining_supervisor_evaluation_and_peer_feedback_in_performanc",
+     "recall": 0.3146067415730337,
+     "n_candidates": 8
+    },
+    {
+     "index": 207,
+     "paper": "mining_supervisor_evaluation_and_peer_feedback_in_performanc",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 208,
+     "paper": "sparse_and_constrained_attention_for_neural_machine_translat",
+     "recall": 0.25572519083969464,
+     "n_candidates": 8
+    },
+    {
+     "index": 209,
+     "paper": "gluoncv_and_gluonnlp_deep_learning_in_computer_vision_and_na",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 210,
+     "paper": "a_framework_for_evaluation_of_machine_reading_comprehension_",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 211,
+     "paper": "a_framework_for_evaluation_of_machine_reading_comprehension_",
+     "recall": 0.21267454350161116,
+     "n_candidates": 8
+    },
+    {
+     "index": 212,
+     "paper": "a_framework_for_evaluation_of_machine_reading_comprehension_",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 213,
+     "paper": "a_framework_for_evaluation_of_machine_reading_comprehension_",
+     "recall": 0.28547297297297297,
+     "n_candidates": 8
+    },
+    {
+     "index": 214,
+     "paper": "an_iterative_approach_for_identifying_complaint_based_tweets",
+     "recall": 0.2903752039151713,
+     "n_candidates": 8
+    },
+    {
+     "index": 215,
+     "paper": "an_iterative_approach_for_identifying_complaint_based_tweets",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 216,
+     "paper": "bridging_the_gap_between_pre_training_and_fine_tuning_for_en",
+     "recall": 0.10621348911311737,
+     "n_candidates": 8
+    },
+    {
+     "index": 217,
+     "paper": "bridging_the_gap_between_pre_training_and_fine_tuning_for_en",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 218,
+     "paper": "dialog_context_language_modeling_with_recurrent_neural_netwo",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 219,
+     "paper": "mitigating_the_impact_of_speech_recognition_errors_on_spoken",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 220,
+     "paper": "mitigating_the_impact_of_speech_recognition_errors_on_spoken",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 221,
+     "paper": "mitigating_the_impact_of_speech_recognition_errors_on_spoken",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 222,
+     "paper": "mitigating_the_impact_of_speech_recognition_errors_on_spoken",
+     "recall": 0.09660574412532637,
+     "n_candidates": 8
+    },
+    {
+     "index": 223,
+     "paper": "word2vec_optimal_hyper_parameters_and_their_impact_on_nlp_do",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 224,
+     "paper": "word2vec_optimal_hyper_parameters_and_their_impact_on_nlp_do",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 225,
+     "paper": "word2vec_optimal_hyper_parameters_and_their_impact_on_nlp_do",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 226,
+     "paper": "word2vec_optimal_hyper_parameters_and_their_impact_on_nlp_do",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 227,
+     "paper": "table_to_text_generation_with_effective_hierarchical_encoder",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 228,
+     "paper": "table_to_text_generation_with_effective_hierarchical_encoder",
+     "recall": 0.24860335195530725,
+     "n_candidates": 8
+    },
+    {
+     "index": 229,
+     "paper": "conversational_flow_in_oxford_style_debates",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 232,
+     "paper": "robust_named_entity_recognition_in_idiosyncratic_domains",
+     "recall": 0.12883435582822086,
+     "n_candidates": 8
+    },
+    {
+     "index": 235,
+     "paper": "offensive_language_detection_a_comparative_analysis",
+     "recall": 0.4,
+     "n_candidates": 8
+    },
+    {
+     "index": 236,
+     "paper": "edinburgh_neural_machine_translation_systems_for_wmt_16",
+     "recall": 0.05299145299145299,
+     "n_candidates": 8
+    },
+    {
+     "index": 237,
+     "paper": "equation_embeddings",
+     "recall": 0.16287878787878787,
+     "n_candidates": 8
+    },
+    {
+     "index": 238,
+     "paper": "equation_embeddings",
+     "recall": 0.573051948051948,
+     "n_candidates": 8
+    },
+    {
+     "index": 239,
+     "paper": "template_free_data_to_text_generation_of_finnish_sports_news",
+     "recall": 0.025331030512377662,
+     "n_candidates": 8
+    },
+    {
+     "index": 241,
+     "paper": "feature_studies_to_inform_the_classification_of_depressive_s",
+     "recall": 0.46646646646646645,
+     "n_candidates": 8
+    },
+    {
+     "index": 243,
+     "paper": "feature_studies_to_inform_the_classification_of_depressive_s",
+     "recall": 0.2641509433962264,
+     "n_candidates": 8
+    },
+    {
+     "index": 244,
+     "paper": "extracting_clinical_concepts_from_user_queries",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 245,
+     "paper": "extracting_clinical_concepts_from_user_queries",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 246,
+     "paper": "attention_based_wav2text_with_feature_transfer_learning",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 247,
+     "paper": "attention_based_wav2text_with_feature_transfer_learning",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 248,
+     "paper": "attention_based_wav2text_with_feature_transfer_learning",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 249,
+     "paper": "contextualize_show_and_tell_a_neural_visual_storyteller",
+     "recall": 0.25,
+     "n_candidates": 8
+    },
+    {
+     "index": 250,
+     "paper": "contextualize_show_and_tell_a_neural_visual_storyteller",
+     "recall": 0.14953271028037382,
+     "n_candidates": 8
+    },
+    {
+     "index": 251,
+     "paper": "contextualize_show_and_tell_a_neural_visual_storyteller",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 252,
+     "paper": "contextualize_show_and_tell_a_neural_visual_storyteller",
+     "recall": 0.6047244094488189,
+     "n_candidates": 8
+    },
+    {
+     "index": 253,
+     "paper": "dolores_deep_contextualized_knowledge_graph_embeddings",
+     "recall": 0.28263795423956933,
+     "n_candidates": 8
+    },
+    {
+     "index": 254,
+     "paper": "dolores_deep_contextualized_knowledge_graph_embeddings",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 256,
+     "paper": "sentiment_analysis_of_twitter_data_for_predicting_stock_mark",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 257,
+     "paper": "sentiment_analysis_of_twitter_data_for_predicting_stock_mark",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 258,
+     "paper": "sentiment_analysis_of_twitter_data_for_predicting_stock_mark",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 259,
+     "paper": "tttttackling_winogrande_schemas",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 260,
+     "paper": "from_free_text_to_clusters_of_content_in_health_records_an_u",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 261,
+     "paper": "examining_gender_and_race_bias_in_two_hundred_sentiment_anal",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 262,
+     "paper": "examining_gender_and_race_bias_in_two_hundred_sentiment_anal",
+     "recall": 0.19759825327510916,
+     "n_candidates": 8
+    },
+    {
+     "index": 263,
+     "paper": "jasper_an_end_to_end_convolutional_neural_acoustic_model",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 264,
+     "paper": "jasper_an_end_to_end_convolutional_neural_acoustic_model",
+     "recall": 0.18733850129198967,
+     "n_candidates": 8
+    },
+    {
+     "index": 265,
+     "paper": "towards_multimodal_understanding_of_passenger_vehicle_intera",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 266,
+     "paper": "towards_multimodal_understanding_of_passenger_vehicle_intera",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 268,
+     "paper": "vais_asr_building_a_conversational_speech_recognition_system",
+     "recall": 0.3917525773195876,
+     "n_candidates": 8
+    },
+    {
+     "index": 269,
+     "paper": "vais_asr_building_a_conversational_speech_recognition_system",
+     "recall": 0.3675564681724846,
+     "n_candidates": 8
+    },
+    {
+     "index": 270,
+     "paper": "vais_asr_building_a_conversational_speech_recognition_system",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 271,
+     "paper": "symmetric_regularization_based_bert_for_pair_wise_semantic_r",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 272,
+     "paper": "symmetric_regularization_based_bert_for_pair_wise_semantic_r",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 273,
+     "paper": "symmetric_regularization_based_bert_for_pair_wise_semantic_r",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 274,
+     "paper": "impact_of_batch_size_on_stopping_active_learning_for_text_cl",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 275,
+     "paper": "impact_of_batch_size_on_stopping_active_learning_for_text_cl",
+     "recall": 1.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 276,
+     "paper": "exploiting_out_of_domain_parallel_data_through_multilingual_",
+     "recall": 0.25889328063241107,
+     "n_candidates": 8
+    },
+    {
+     "index": 277,
+     "paper": "automatic_discourse_segmentation_an_evaluation_in_french",
+     "recall": 0.24866310160427807,
+     "n_candidates": 8
+    },
+    {
+     "index": 278,
+     "paper": "crowdsourcing_for_beyond_polarity_sentiment_analysis_a_pure_",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 280,
+     "paper": "high_quality_elmo_embeddings_for_seven_less_resourced_langua",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 282,
+     "paper": "fully_convolutional_speech_recognition",
+     "recall": 0.3103448275862069,
+     "n_candidates": 8
+    },
+    {
+     "index": 283,
+     "paper": "affective_behaviour_analysis_of_on_line_user_interactions_ar",
+     "recall": 0.3907563025210084,
+     "n_candidates": 8
+    },
+    {
+     "index": 284,
+     "paper": "affective_behaviour_analysis_of_on_line_user_interactions_ar",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 285,
+     "paper": "the_effect_of_heterogeneous_data_for_alzheimer_s_disease_det",
+     "recall": 0.0,
+     "n_candidates": 8
+    },
+    {
+     "index": 286,
+     "paper": "natural_language_processing_via_lda_topic_model_in_recommend",
+     "recall": 0.31718061674008813,
+     "n_candidates": 8
+    }
+   ],
+   "questions": 255,
+   "found": 135,
+   "found_rate": 0.5294117647058824,
+   "recall": 0.24426034990989232,
+   "recall_given_found": 0.4613806609409077
+  }
+ ],
+ "comparisons": [
+  {
+   "a": "bm25",
+   "b": "dense (archived: tight_relative.json)",
+   "recall_diff": -0.0734936043264192,
+   "recall_diff_ci": [
+    -0.11526700792472125,
+    -0.031260674848641
+   ],
+   "recall_diff_p": 0.0012998700129987,
+   "found_rate_diff": -0.047058823529411764,
+   "found_rate_diff_ci": [
+    -0.11406844106463879,
+    0.019157088122605363
+   ],
+   "found_rate_diff_p": 0.20707929207079293,
+   "found_by_both": 105,
+   "found_only_by_a": 30,
+   "found_only_by_b": 42,
+   "found_by_neither": 78,
+   "found_by_either_rate": 0.6941176470588235
+  }
+ ]
+}
