@@ -71,6 +71,10 @@ class EvidenceUnit:
     retrieval_score: float = 0.0
     # Second-stage cross-encoder score, when reranking is enabled. None means not reranked.
     rerank_score: float | None = None
+    # Fused first-stage score, set only by `retrieval.mode: hybrid`. It orders candidates
+    # that dense and lexical retrieval ranked differently; `retrieval_score` stays cosine
+    # for the same reason as above. None means retrieval was not fused.
+    fusion_score: float | None = None
     uncertainty: float = 0.0
     token_count: int = 0
 
@@ -80,13 +84,17 @@ class EvidenceUnit:
 
     @property
     def rank_score(self) -> float:
-        """The score every stage orders by — reranked if available, retrieval otherwise.
+        """The score every stage orders by: reranked, else fused, else retrieval.
 
         Compression and restoration must agree on this, or reranking would be silently
         undone: compression sorting by `retrieval_score` after a reranker had reordered
         the candidates would discard exactly the work the reranker did.
         """
-        return self.retrieval_score if self.rerank_score is None else self.rerank_score
+        if self.rerank_score is not None:
+            return self.rerank_score
+        if self.fusion_score is not None:
+            return self.fusion_score
+        return self.retrieval_score
 
 
 @dataclass

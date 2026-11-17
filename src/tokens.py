@@ -65,12 +65,18 @@ class TokenCounter:
         return [self.count(t) for t in texts]
 
 
-_shared: TokenCounter | None = None
+_shared: dict[str, TokenCounter] = {}
 
 
 def shared_counter(cfg: Config | None = None) -> TokenCounter:
-    """Process-wide counter, so the tokenizer is loaded at most once."""
-    global _shared
-    if _shared is None:
-        _shared = TokenCounter(cfg=cfg)
-    return _shared
+    """Process-wide counter per generation model, so each tokenizer is loaded at most once.
+
+    Keyed by model id: a single shared instance would hand the first model's tokenizer to
+    every later config, and a token count from the wrong tokenizer is a wrong cost claim
+    that `is_exact` would still report as exact.
+    """
+    cfg = cfg or default_config()
+    model_id = cfg.require("models.generation")
+    if model_id not in _shared:
+        _shared[model_id] = TokenCounter(model_id=model_id, cfg=cfg)
+    return _shared[model_id]

@@ -57,6 +57,11 @@ def restore_from_corpus(
                 span=unit.span,
                 text=unit.span.resolve(corpus),
                 retrieval_score=unit.retrieval_score,
+                # Ordering scores travel with the span. Without them the rebuilt units fall
+                # back to cosine order, and the two recovery routes disagree whenever a
+                # reranker or a fused retrieval has reordered the candidates.
+                rerank_score=unit.rerank_score,
+                fusion_score=unit.fusion_score,
                 uncertainty=unit.uncertainty,
                 token_count=unit.token_count,
             )
