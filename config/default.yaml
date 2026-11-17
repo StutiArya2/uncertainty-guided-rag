@@ -71,6 +71,30 @@ kb:
 retrieval:
   # Candidates pulled per claim before mapping.
   top_k: 8
+  # FIRST-STAGE SIGNAL. "dense" is what every archived result used; leave it for those.
+  #
+  #   dense  — bi-encoder cosine.
+  #   bm25   — lexical BM25 over the same chunks. Needs no model.
+  #   hybrid — dense and BM25 rankings fused by reciprocal rank.
+  #
+  # Measured on QASPER at top_k=8 against human-marked evidence, 255 questions
+  # (artifacts/retrieval-recall/bm25_vs_dense.json):
+  #     dense   finds any marked evidence on 57.6% of questions, 31.8% of marked characters
+  #     bm25    52.9% and 24.4%
+  # BM25 alone is worse. It finds marked evidence on 30 of the 108 questions where dense
+  # finds none, which is the case for fusing them. `hybrid` itself is NOT yet measured:
+  # run scripts/measure_retrieval.py --modes dense bm25 hybrid before switching.
+  #
+  # In "bm25" mode retrieval_score is no longer cosine, so uncertainty.*,
+  # abstain.low_retrieval_score and server.retrieval_floor all need recalibrating.
+  # "hybrid" keeps retrieval_score as cosine and those thresholds keep their meaning.
+  mode: dense
+  bm25:
+    # Standard Okapi defaults, not tuned on QASPER.
+    k1: 1.2
+    b: 0.75
+  # Reciprocal-rank-fusion constant. 60 is the value from Cormack et al. (2009), not tuned.
+  rrf_k: 60
   # Embeddings are cached to disk keyed by (model, corpus hash).
   cache_dir: .cache/embeddings
 

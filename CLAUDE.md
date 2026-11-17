@@ -96,7 +96,7 @@ measurements are recorded in the relevant module docstring.
 ## Testing
 
 ```bash
-pytest tests/ -v                     # 174 tests
+pytest tests/ -v                     # everything
 pytest tests/ -m "not integration"   # skip tests needing model weights
 ```
 

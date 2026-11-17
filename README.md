@@ -178,6 +178,35 @@ Evidence is scored **title-prefixed**. Sentence chunks are often anaphoric — "
 has two tunable parameters" never names BM25 — and without the document title the scorer
 cannot resolve the subject (measured 0.004 → 0.997 for the same chunk).
 
+### First-stage retrieval modes
+
+`retrieval.mode` picks the first-stage signal: `dense` (bi-encoder cosine, the default and
+what every archived result used), `bm25` (lexical, needs no model) or `hybrid` (both
+rankings fused by reciprocal rank). Everything downstream is capped by what this stage
+returns, so it is measured directly, without the generator or the scorer:
+
+```bash
+python scripts/measure_retrieval.py --questions data/qasper/questions.yaml \
+    --kb data/qasper/kb --modes bm25 \
+    --compare-run artifacts/qasper-main/tight_relative.json \
+    --json artifacts/retrieval-recall/bm25_vs_dense.json
+```
+
+On QASPER at `top_k=8`, 255 questions with aligned human-marked evidence
+(`artifacts/retrieval-recall/bm25_vs_dense.json`):
+
+| Mode | Finds any marked evidence | Marked characters retrieved |
+| --- | --- | --- |
+| dense (archived run) | 57.6% | 31.8% |
+| bm25 | 52.9% | 24.4% |
+
+BM25 alone is worse than dense (recall −0.073, clustered 95% CI [−0.115, −0.031]). The two
+fail on different questions: BM25 finds marked evidence on 30 of the 108 questions where
+dense finds none, and one or the other finds it on 69.4%. That is the case for fusion, and
+only the case: **`hybrid` is implemented and unit-tested but not yet measured**, because it
+needs the embedding model. Run the script with `--modes dense bm25 hybrid` before quoting
+it or changing the default.
+
 ## Tech Stack
 
 - **Python 3.14**, PyTorch (MPS/CUDA/CPU auto-selected)

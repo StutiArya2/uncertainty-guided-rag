@@ -131,8 +131,12 @@ class Pipeline:
         compressed: list,
         final_evidence: list[ClaimEvidence],
         trace: PipelineTrace,
-    ) -> bool:
+    ) -> dict:
         """Draft an answer, check the evidence entails it, and restore if it does not.
+
+        Returns `{claim index: verdict after restoration}` for the claims it restored, and
+        an empty dict when it restored nothing. The caller needs to know *which* claims:
+        a claim that kept its compression must keep its saving in the trace too.
 
         This is the only check that asks about the *answer* rather than the topic, which
         is why it is the only one that can notice the failure the others miss: evidence
@@ -167,34 +171,31 @@ class Pipeline:
         trace.draft_answer = draft
 
         if report.grounded:
-            return False
+            return {}
 
+        flagged = [
+            i for i, comp in enumerate(compressed)
+            if comp.dropped and self._relative_says_restore(comp)
+        ]
         if report.vacuous:
             # The draft made no checkable assertion — a refusal, or a bare yes/no whose
             # entailment score is meaningless. Verification abstains rather than guessing,
             # and the comparative signal decides instead. Treating "unverifiable" as
             # "unsupported" would restore on every yes/no question and forfeit the saving.
-            return any(
-                self._relative_says_restore(comp) for comp in compressed if comp.dropped
-            )
+            targeted = flagged
+        else:
+            # The draft is ungrounded. Restore the claims whose support actually fell, not
+            # every claim that happened to drop something. If the comparative signal
+            # blames nothing, the loss is invisible to it but the answer is still
+            # ungrounded — so fall back to restoring everything dropped rather than
+            # silently doing nothing about a detected failure.
+            targeted = flagged or [i for i, comp in enumerate(compressed) if comp.dropped]
 
-        # The draft is ungrounded. Restore the claims whose support actually fell, not
-        # every claim that happened to drop something.
-        restored = False
-        targeted = [
-            i for i, comp in enumerate(compressed)
-            if comp.dropped and self._relative_says_restore(comp)
-        ]
-        # If the comparative signal blames nothing, the loss is invisible to it but the
-        # answer is still ungrounded — so fall back to restoring everything dropped
-        # rather than silently doing nothing about a detected failure.
-        if not targeted:
-            targeted = [i for i, comp in enumerate(compressed) if comp.dropped]
-
+        restored: dict[int, object] = {}
         for index in targeted:
-            current, _ = self._restore_and_recheck(compressed[index])
+            current, verdict = self._restore_and_recheck(compressed[index])
             final_evidence[index] = current
-            restored = True
+            restored[index] = verdict
         return restored
 
     def _restore_and_recheck(self, comp):
@@ -404,15 +405,21 @@ class Pipeline:
             and all(v.is_sufficient for v in verdicts)
             and any(c.dropped for c in compressed)
         ):
-            if self._verify_and_restore(query, compressed, final_evidence, trace):
+            restored = self._verify_and_restore(query, compressed, final_evidence, trace)
+            if restored:
                 restoration_triggered = True
-                verdicts = [
-                    self.evaluator.evaluate(item.claim, item.units)
-                    for item in final_evidence
-                ]
-                for claim_trace, verdict in zip(trace.claims, verdicts):
-                    claim_trace.restored_support_score = verdict.support_score
-                    claim_trace.restored_sufficient = verdict.is_sufficient
+            # Only the claims actually restored are re-recorded. Marking every claim as
+            # restored charged the untouched ones their full baseline cost, so the arm
+            # reported less reduction than the evidence it sent.
+            for index, verdict in restored.items():
+                verdicts[index] = verdict
+                claim_trace, current = trace.claims[index], final_evidence[index]
+                claim_trace.restored_support_score = verdict.support_score
+                claim_trace.restored_sufficient = verdict.is_sufficient
+                claim_trace.n_restored = len(current.units) - len(compressed[index].kept)
+                claim_trace.restored_tokens = sum(
+                    self.counter.count(u.text) for u in current.units
+                )
 
         trace.restoration_triggered = restoration_triggered
         unsupported = [v.claim for v in verdicts if not v.is_sufficient]
